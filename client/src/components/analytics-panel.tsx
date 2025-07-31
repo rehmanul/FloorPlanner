@@ -42,7 +42,9 @@ export default function AnalyticsPanel({
               </div>
               <div className="text-sm opacity-90">Usable Area (m²)</div>
             </CardContent>
-          </Card></old_str>
+          </Card>
+          <Card className="analysis-card text-white">
+            <CardContent className="p-4"></old_str>
           </Card>
           <Card className="analysis-card text-white">
             <CardContent className="p-4">
