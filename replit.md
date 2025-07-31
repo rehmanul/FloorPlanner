@@ -17,6 +17,7 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: React hooks with TanStack Query for server state
 - **Routing**: Wouter for lightweight client-side routing
 - **Canvas Rendering**: Custom HTML5 Canvas implementation for CAD visualization
+- **Layout System**: Collapsible drawer architecture with left (tools/config) and right (analytics) sidebars that can be toggled for maximum display area utilization
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js REST API

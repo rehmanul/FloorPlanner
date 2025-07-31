@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Zap, Save, Eye } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Upload, Zap, Save, Eye, Menu, Settings, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import FileUpload from "@/components/file-upload";
 import CADCanvas from "@/components/cad-canvas";
 import AnalysisTools from "@/components/analysis-tools";
@@ -35,6 +36,8 @@ interface AppState {
   };
   analytics: LayoutAnalytics | null;
   show3DWalkthrough: boolean;
+  leftDrawerOpen: boolean;
+  rightDrawerOpen: boolean;
 }
 
 export default function FloorPlanAnalyzer() {
@@ -63,7 +66,9 @@ export default function FloorPlanAnalyzer() {
       labels: false
     },
     analytics: null,
-    show3DWalkthrough: false
+    show3DWalkthrough: false,
+    leftDrawerOpen: false,
+    rightDrawerOpen: false
   });
 
   const [processingStage, setProcessingStage] = useState("");
@@ -169,6 +174,44 @@ export default function FloorPlanAnalyzer() {
     setAppState(prev => ({ ...prev, show3DWalkthrough: false }));
   }, []);
 
+  const toggleLeftDrawer = useCallback(() => {
+    setAppState(prev => ({ ...prev, leftDrawerOpen: !prev.leftDrawerOpen }));
+  }, []);
+
+  const toggleRightDrawer = useCallback(() => {
+    setAppState(prev => ({ ...prev, rightDrawerOpen: !prev.rightDrawerOpen }));
+  }, []);
+
+  // Keyboard shortcuts for drawer control
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.code) {
+          case 'Digit1':
+            event.preventDefault();
+            toggleLeftDrawer();
+            break;
+          case 'Digit2':
+            event.preventDefault();
+            toggleRightDrawer();
+            break;
+          case 'KeyF':
+            event.preventDefault();
+            // Toggle full-screen mode (collapse both drawers)
+            setAppState(prev => ({
+              ...prev,
+              leftDrawerOpen: false,
+              rightDrawerOpen: false
+            }));
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleLeftDrawer, toggleRightDrawer]);
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -202,36 +245,99 @@ export default function FloorPlanAnalyzer() {
       </header>
 
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 shadow-sm flex flex-col overflow-y-auto">
-          <FileUpload
-            onFileProcessed={handleFileProcessed}
-            onProcessingUpdate={handleProcessingUpdate}
-            processing={appState.processing}
-          />
-          
-          <AnalysisTools
-            selectedTool={appState.selectedTool}
-            onToolChange={handleToolChange}
-          />
-          
-          <IlotConfiguration
-            settings={appState.settings}
-            floorPlan={appState.floorPlan}
-            onSettingsChange={handleSettingsChange}
-            onIlotsGenerated={handleIlotsGenerated}
-            processing={appState.processing}
-          />
-          
-          <LayerControls
-            layers={appState.layers}
-            onLayerToggle={handleLayerToggle}
-          />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Left Drawer */}
+        <div className={`
+          transition-all duration-300 ease-in-out bg-white border-r border-gray-200 shadow-lg z-20
+          ${appState.leftDrawerOpen ? 'w-80' : 'w-0 overflow-hidden'}
+        `}>
+          <div className="w-80 flex flex-col h-full overflow-y-auto">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Tools & Configuration</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleLeftDrawer}
+                  className="p-1 h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              <FileUpload
+                onFileProcessed={handleFileProcessed}
+                onProcessingUpdate={handleProcessingUpdate}
+                processing={appState.processing}
+              />
+              
+              <AnalysisTools
+                selectedTool={appState.selectedTool}
+                onToolChange={handleToolChange}
+              />
+              
+              <IlotConfiguration
+                settings={appState.settings}
+                floorPlan={appState.floorPlan}
+                onSettingsChange={handleSettingsChange}
+                onIlotsGenerated={handleIlotsGenerated}
+                processing={appState.processing}
+              />
+              
+              <LayerControls
+                layers={appState.layers}
+                onLayerToggle={handleLayerToggle}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Main Canvas Area */}
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-white relative">
+          {/* Drawer Toggle Buttons */}
+          <div className="absolute top-4 left-4 z-30 flex space-x-2">
+            {!appState.leftDrawerOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleLeftDrawer}
+                className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-blue-200 hover:border-blue-300"
+                title="Open Tools Panel (Ctrl+1)"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Tools
+              </Button>
+            )}
+          </div>
+          
+          <div className="absolute top-4 right-4 z-30 flex space-x-2">
+            {!appState.rightDrawerOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleRightDrawer}
+                className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-green-200 hover:border-green-300"
+                title="Open Analytics Panel (Ctrl+2)"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
+              </Button>
+            )}
+          </div>
+          
+          {/* Keyboard Shortcuts Hint */}
+          <div className="absolute bottom-4 right-4 z-30">
+            <div className="bg-black/70 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm">
+              <div className="space-y-1">
+                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+1</kbd> Tools</div>
+                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+2</kbd> Analytics</div>
+                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+F</kbd> Full Screen</div>
+              </div>
+            </div>
+          </div>
+          
           <CADCanvas
             ref={canvasRef}
             floorPlan={appState.floorPlan}
@@ -245,14 +351,35 @@ export default function FloorPlanAnalyzer() {
           />
         </div>
 
-        {/* Right Analytics Panel */}
-        <div className="w-96 bg-white border-l border-gray-200 shadow-sm flex flex-col overflow-y-auto">
-          <AnalyticsPanel
-            floorPlan={appState.floorPlan}
-            analytics={appState.analytics}
-            settings={appState.settings}
-            onSettingsChange={handleSettingsChange}
-          />
+        {/* Right Drawer */}
+        <div className={`
+          transition-all duration-300 ease-in-out bg-white border-l border-gray-200 shadow-lg z-20
+          ${appState.rightDrawerOpen ? 'w-96' : 'w-0 overflow-hidden'}
+        `}>
+          <div className="w-96 flex flex-col h-full overflow-y-auto">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Analytics & Insights</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleRightDrawer}
+                  className="p-1 h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              <AnalyticsPanel
+                floorPlan={appState.floorPlan}
+                analytics={appState.analytics}
+                settings={appState.settings}
+                onSettingsChange={handleSettingsChange}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -287,13 +414,15 @@ export default function FloorPlanAnalyzer() {
 
       {/* 3D Walkthrough Modal */}
       {appState.show3DWalkthrough && (
-        <Walkthrough3D
-          floorPlan={appState.floorPlan}
-          ilots={appState.ilots}
-          walls={appState.floorPlan?.processed?.walls || []}
-          corridors={appState.corridors}
-          onClose={handle3DWalkthroughClose}
-        />
+        <div className="fixed inset-0 z-50 bg-black">
+          <Walkthrough3D
+            floorPlan={appState.floorPlan}
+            ilots={appState.ilots}
+            walls={appState.floorPlan?.processed?.walls || []}
+            corridors={appState.corridors}
+            onClose={handle3DWalkthroughClose}
+          />
+        </div>
       )}
     </div>
   );
