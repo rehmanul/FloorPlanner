@@ -1,0 +1,2013 @@
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { 
+  Upload, Settings, Download, Play, RotateCcw, Layers, ZoomIn, ZoomOut, 
+  Move, RotateCw, Save, FileText, Calculator, Eye, EyeOff, Grid,
+  MapPin, Ruler, Hand, MousePointer, Square, Circle, Triangle,
+  Trash2, Copy, Edit3, Info, AlertTriangle, CheckCircle, Target,
+  Navigation, Maximize2, Minimize2, RefreshCw, Database, Filter,
+  BarChart3, PieChart, TrendingUp, Layout, Compass, Gauge
+} from 'lucide-react';
+
+const AdvancedCADFloorPlanAnalyzer = () => {
+  // Core state
+  const [currentView, setCurrentView] = useState('upload');
+  const [file, setFile] = useState(null);
+  const [floorPlan, setFloorPlan] = useState(null);
+  const [ilots, setIlots] = useState([]);
+  const [corridors, setCorridors] = useState([]);
+  const [processing, setProcessing] = useState(false);
+  const [selectedTool, setSelectedTool] = useState('select');
+  const [selectedElements, setSelectedElements] = useState([]);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState('');
+  
+  // Advanced settings
+  const [settings, setSettings] = useState({
+    density: 25,
+    corridorWidth: 1.2,
+    minClearance: 0.8,
+    maxClearance: 2.0,
+    ilotSizes: { 
+      small: { width: 80, height: 60, area: 4.8, color: '#FEE2E2' },
+      medium: { width: 120, height: 80, area: 9.6, color: '#FECACA' },
+      large: { width: 160, height: 100, area: 16.0, color: '#FCA5A5' },
+      xlarge: { width: 200, height: 120, area: 24.0, color: '#F87171' }
+    },
+    algorithm: 'intelligent',
+    priority: 'area',
+    exitDistance: 50,
+    fireRegulations: true,
+    accessibilityCompliance: true
+  });
+
+  // Visualization state
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 800, height: 600, scale: 1 });
+  const [showGrid, setShowGrid] = useState(true);
+  const [layerVisibility, setLayerVisibility] = useState({
+    walls: true,
+    doors: true,
+    windows: true,
+    stairs: true,
+    elevators: true,
+    restricted: true,
+    ilots: true,
+    corridors: true,
+    measurements: false,
+    labels: true,
+    grid: true,
+    heatmap: false
+  });
+
+  // Analytics state
+  const [analytics, setAnalytics] = useState({
+    totalArea: 0,
+    usableArea: 0,
+    ilotArea: 0,
+    corridorArea: 0,
+    efficiency: 0,
+    accessibility: 0,
+    fireCompliance: 0,
+    circulation: 0
+  });
+
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Real image processing functions
+  const analyzeImageForWalls = (imageData, width, height) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = width;
+    canvas.height = height;
+    
+    const img = new Image();
+    return new Promise((resolve) => {
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, width, height);
+        const imageDataObj = ctx.getImageData(0, 0, width, height);
+        const data = imageDataObj.data;
+        
+        // Edge detection for walls
+        const walls = [];
+        const edges = detectEdges(data, width, height);
+        const lines = houghLineTransform(edges, width, height);
+        
+        // Convert detected lines to wall objects
+        lines.forEach((line, index) => {
+          if (line.length > 50) { // Minimum wall length
+            walls.push({
+              id: `detected_wall_${index}`,
+              points: line.points,
+              type: line.thickness > 10 ? 'exterior' : 'interior',
+              thickness: line.thickness,
+              confidence: line.confidence
+            });
+          }
+        });
+        
+        resolve(walls);
+      };
+      img.src = imageData;
+    });
+  };
+
+  const detectEdges = (imageData, width, height) => {
+    const edges = new Array(width * height).fill(0);
+    const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+    const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0, gy = 0;
+        
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * width + (x + kx)) * 4;
+            const gray = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            const kernelIdx = (ky + 1) * 3 + (kx + 1);
+            
+            gx += gray * sobelX[kernelIdx];
+            gy += gray * sobelY[kernelIdx];
+          }
+        }
+        
+        const magnitude = Math.sqrt(gx * gx + gy * gy);
+        edges[y * width + x] = magnitude > 100 ? 255 : 0;
+      }
+    }
+    
+    return edges;
+  };
+
+  const houghLineTransform = (edges, width, height) => {
+    const lines = [];
+    const threshold = 50;
+    const maxRho = Math.sqrt(width * width + height * height);
+    const rhoStep = 1;
+    const thetaStep = Math.PI / 180;
+    
+    const accumulator = {};
+    
+    // Accumulate edge points
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (edges[y * width + x] > 0) {
+          for (let theta = 0; theta < Math.PI; theta += thetaStep) {
+            const rho = Math.round(x * Math.cos(theta) + y * Math.sin(theta));
+            const thetaKey = Math.round(theta * 180 / Math.PI);
+            const key = `${rho}_${thetaKey}`;
+            
+            accumulator[key] = (accumulator[key] || 0) + 1;
+          }
+        }
+      }
+    }
+    
+    // Extract lines from accumulator
+    Object.entries(accumulator).forEach(([key, votes]) => {
+      if (votes > threshold) {
+        const [rho, theta] = key.split('_').map(Number);
+        const thetaRad = theta * Math.PI / 180;
+        
+        // Convert polar to cartesian coordinates
+        const points = [];
+        for (let x = 0; x < width; x++) {
+          const y = (rho - x * Math.cos(thetaRad)) / Math.sin(thetaRad);
+          if (y >= 0 && y < height) {
+            points.push([x, y]);
+          }
+        }
+        
+        if (points.length >= 2) {
+          lines.push({
+            points: [points[0], points[points.length - 1]],
+            length: Math.sqrt(
+              Math.pow(points[points.length - 1][0] - points[0][0], 2) +
+              Math.pow(points[points.length - 1][1] - points[0][1], 2)
+            ),
+            thickness: Math.max(3, votes / 10),
+            confidence: Math.min(100, votes / threshold * 100)
+          });
+        }
+      }
+    });
+    
+    return lines.sort((a, b) => b.confidence - a.confidence);
+  };
+
+  const detectDoorsAndWindows = (imageData, walls, width, height) => {
+    const doors = [];
+    const windows = [];
+    
+    // Analyze wall gaps and openings
+    walls.forEach((wall, wallIndex) => {
+      const openings = findWallOpenings(wall, imageData, width, height);
+      
+      openings.forEach((opening, openingIndex) => {
+        const openingWidth = opening.width;
+        const aspectRatio = opening.width / opening.height;
+        
+        if (openingWidth > 60 && openingWidth < 150 && aspectRatio > 3) {
+          // Likely a door
+          doors.push({
+            id: `detected_door_${wallIndex}_${openingIndex}`,
+            points: opening.points,
+            type: openingWidth > 100 ? 'main' : 'interior',
+            swing: 'inward',
+            width: openingWidth,
+            confidence: opening.confidence
+          });
+        } else if (openingWidth > 40 && aspectRatio > 2) {
+          // Likely a window
+          windows.push({
+            id: `detected_window_${wallIndex}_${openingIndex}`,
+            points: opening.points,
+            type: 'fixed',
+            width: openingWidth,
+            confidence: opening.confidence
+          });
+        }
+      });
+    });
+    
+    return { doors, windows };
+  };
+
+  const findWallOpenings = (wall, imageData, width, height) => {
+    const openings = [];
+    const [startPoint, endPoint] = wall.points;
+    
+    // Sample along the wall line to find gaps
+    const wallLength = Math.sqrt(
+      Math.pow(endPoint[0] - startPoint[0], 2) + 
+      Math.pow(endPoint[1] - startPoint[1], 2)
+    );
+    
+    const step = 5;
+    let currentOpening = null;
+    
+    for (let i = 0; i < wallLength; i += step) {
+      const t = i / wallLength;
+      const x = Math.round(startPoint[0] + t * (endPoint[0] - startPoint[0]));
+      const y = Math.round(startPoint[1] + t * (endPoint[1] - startPoint[1]));
+      
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        const idx = (y * width + x) * 4;
+        const brightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+        
+        // White/light areas indicate openings
+        if (brightness > 200) {
+          if (!currentOpening) {
+            currentOpening = {
+              start: [x, y],
+              points: [[x, y]],
+              width: 0,
+              height: wall.thickness || 10
+            };
+          }
+          currentOpening.points.push([x, y]);
+        } else {
+          if (currentOpening && currentOpening.points.length > 2) {
+            currentOpening.end = [x, y];
+            currentOpening.width = Math.sqrt(
+              Math.pow(currentOpening.end[0] - currentOpening.start[0], 2) +
+              Math.pow(currentOpening.end[1] - currentOpening.start[1], 2)
+            );
+            currentOpening.confidence = Math.min(100, currentOpening.points.length * 5);
+            
+            if (currentOpening.width > 30) {
+              openings.push(currentOpening);
+            }
+          }
+          currentOpening = null;
+        }
+      }
+    }
+    
+    return openings;
+  };
+
+  const analyzeSpaceUsage = (walls, doors, windows, width, height) => {
+    // Create occupancy grid
+    const grid = new Array(Math.ceil(height / 10)).fill(null).map(() => 
+      new Array(Math.ceil(width / 10)).fill(false)
+    );
+    
+    // Mark walls in grid
+    walls.forEach(wall => {
+      wall.points.forEach(point => {
+        const gridX = Math.floor(point[0] / 10);
+        const gridY = Math.floor(point[1] / 10);
+        if (gridX >= 0 && gridX < grid[0].length && gridY >= 0 && gridY < grid.length) {
+          grid[gridY][gridX] = true;
+        }
+      });
+    });
+    
+    // Calculate usable areas
+    let totalCells = grid.length * grid[0].length;
+    let occupiedCells = 0;
+    
+    grid.forEach(row => {
+      row.forEach(cell => {
+        if (cell) occupiedCells++;
+      });
+    });
+    
+    const totalArea = width * height;
+    const usableArea = totalArea * (1 - occupiedCells / totalCells);
+    
+    return {
+      totalArea,
+      usableArea,
+      occupancyGrid: grid,
+      bounds: { minX: 0, minY: 0, maxX: width, maxY: height }
+    };
+  };
+
+  // Utility functions
+  const rectanglesOverlap = (rect1, rect2, buffer = 0) => {
+    return !(rect1.x + rect1.width + buffer < rect2.x || 
+             rect2.x + rect2.width + buffer < rect1.x || 
+             rect1.y + rect1.height + buffer < rect2.y || 
+             rect2.y + rect2.height + buffer < rect1.y);
+  };
+
+  const rectangleOverlapsPolygon = (rect, polygon, buffer = 0) => {
+    if (polygon.length < 3) return false;
+    const minX = Math.min(...polygon.map(p => p[0]));
+    const maxX = Math.max(...polygon.map(p => p[0]));
+    const minY = Math.min(...polygon.map(p => p[1]));
+    const maxY = Math.max(...polygon.map(p => p[1]));
+    
+    return !(rect.x + rect.width + buffer < minX || 
+             rect.x - buffer > maxX || 
+             rect.y + rect.height + buffer < minY || 
+             rect.y - buffer > maxY);
+  };
+
+  const checkAccessibilityCompliance = (ilot, plan) => {
+    const requiredClearance = 120;
+    return ilot.x > plan.bounds.minX + requiredClearance &&
+           ilot.x + ilot.width < plan.bounds.maxX - requiredClearance &&
+           ilot.y > plan.bounds.minY + requiredClearance &&
+           ilot.y + ilot.height < plan.bounds.maxY - requiredClearance;
+  };
+
+  // Validation function
+  const isValidPlacement = (newIlot, existingIlots, plan) => {
+    const buffer = settings.minClearance * 10;
+    
+    for (const existingIlot of existingIlots) {
+      if (rectanglesOverlap(newIlot, existingIlot, buffer)) {
+        return false;
+      }
+    }
+    
+    for (const restricted of (plan.restrictedAreas || [])) {
+      if (rectangleOverlapsPolygon(newIlot, restricted.points, buffer)) {
+        return false;
+      }
+    }
+    
+    if (settings.accessibilityCompliance) {
+      if (!checkAccessibilityCompliance(newIlot, plan)) {
+        return false;
+      }
+    }
+    
+    if (newIlot.x < plan.bounds.minX + 50 || 
+        newIlot.x + newIlot.width > plan.bounds.maxX - 50 ||
+        newIlot.y < plan.bounds.minY + 50 || 
+        newIlot.y + newIlot.height > plan.bounds.maxY - 50) {
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Layout generation algorithms
+  const generateIntelligentLayout = (bounds, targetArea) => {
+    const ilotTypes = Object.entries(settings.ilotSizes).map(([type, config]) => ({
+      type,
+      ...config
+    }));
+    
+    const ilotList = [];
+    let placedArea = 0;
+    const maxAttempts = 1000;
+    let attempts = 0;
+    
+    // Sort ilot types by priority
+    ilotTypes.sort((a, b) => {
+      if (settings.priority === 'area') return b.area - a.area;
+      if (settings.priority === 'efficiency') return a.area / (a.width * a.height) - b.area / (b.width * b.height);
+      return 0;
+    });
+    
+    while (placedArea < targetArea && attempts < maxAttempts) {
+      // Smart selection based on remaining space
+      const remainingArea = targetArea - placedArea;
+      const suitableTypes = ilotTypes.filter(type => type.area <= remainingArea * 1.5);
+      
+      if (suitableTypes.length === 0) break;
+      
+      const ilotType = suitableTypes[Math.floor(Math.random() * suitableTypes.length)];
+      
+      // Try placement in promising locations first
+      let placed = false;
+      const placementAttempts = 50;
+      
+      for (let pa = 0; pa < placementAttempts && !placed; pa++) {
+        let x, y;
+        
+        if (pa < 20) {
+          // Try near existing ilots for clustering
+          if (ilotList.length > 0) {
+            const referenceIlot = ilotList[Math.floor(Math.random() * ilotList.length)];
+            const angle = Math.random() * 2 * Math.PI;
+            const distance = 100 + Math.random() * 100;
+            x = referenceIlot.x + Math.cos(angle) * distance;
+            y = referenceIlot.y + Math.sin(angle) * distance;
+          } else {
+            x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX - ilotType.width);
+            y = bounds.minY + Math.random() * (bounds.maxY - bounds.minY - ilotType.height);
+          }
+        } else {
+          // Random placement
+          x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX - ilotType.width);
+          y = bounds.minY + Math.random() * (bounds.maxY - bounds.minY - ilotType.height);
+        }
+        
+        const newIlot = {
+          id: `ilot_${ilotList.length + 1}`,
+          x,
+          y,
+          width: ilotType.width,
+          height: ilotType.height,
+          type: ilotType.type,
+          color: ilotType.color,
+          area: ilotType.area,
+          rotation: 0
+        };
+        
+        if (isValidPlacement(newIlot, ilotList, floorPlan)) {
+          ilotList.push(newIlot);
+          placedArea += ilotType.area;
+          placed = true;
+        }
+      }
+      
+      attempts++;
+    }
+    
+    return ilotList;
+  };
+
+  const generateGridLayout = (bounds, targetArea) => {
+    const ilotList = [];
+    let placedArea = 0;
+    
+    const ilotType = settings.ilotSizes.medium;
+    const spacing = Math.max(ilotType.width, ilotType.height) + settings.minClearance * 10;
+    
+    for (let x = bounds.minX + 100; x < bounds.maxX - ilotType.width - 100; x += spacing) {
+      for (let y = bounds.minY + 100; y < bounds.maxY - ilotType.height - 100; y += spacing) {
+        if (placedArea >= targetArea) break;
+        
+        const newIlot = {
+          id: `grid_ilot_${ilotList.length + 1}`,
+          x,
+          y,
+          width: ilotType.width,
+          height: ilotType.height,
+          type: 'medium',
+          color: ilotType.color,
+          area: ilotType.area,
+          rotation: 0
+        };
+        
+        if (isValidPlacement(newIlot, ilotList, floorPlan)) {
+          ilotList.push(newIlot);
+          placedArea += ilotType.area;
+        }
+      }
+      if (placedArea >= targetArea) break;
+    }
+    
+    return ilotList;
+  };
+
+  const generateOrganicLayout = (bounds, targetArea) => {
+    const ilotList = [];
+    let placedArea = 0;
+    const maxAttempts = 2000;
+    let attempts = 0;
+    
+    // Create clusters for organic feel
+    const clusterCenters = [];
+    const numClusters = Math.min(5, Math.floor(targetArea / 50));
+    
+    for (let i = 0; i < numClusters; i++) {
+      clusterCenters.push({
+        x: bounds.minX + 200 + Math.random() * (bounds.maxX - bounds.minX - 400),
+        y: bounds.minY + 200 + Math.random() * (bounds.maxY - bounds.minY - 400),
+        radius: 150 + Math.random() * 100
+      });
+    }
+    
+    while (placedArea < targetArea && attempts < maxAttempts) {
+      const ilotTypes = Object.entries(settings.ilotSizes);
+      const [typeName, typeConfig] = ilotTypes[Math.floor(Math.random() * ilotTypes.length)];
+      
+      let x, y;
+      
+      if (Math.random() < 0.7 && clusterCenters.length > 0) {
+        // Place near cluster center
+        const cluster = clusterCenters[Math.floor(Math.random() * clusterCenters.length)];
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * cluster.radius;
+        x = cluster.x + Math.cos(angle) * distance;
+        y = cluster.y + Math.sin(angle) * distance;
+      } else {
+        // Random placement
+        x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX - typeConfig.width);
+        y = bounds.minY + Math.random() * (bounds.maxY - bounds.minY - typeConfig.height);
+      }
+      
+      const newIlot = {
+        id: `organic_ilot_${ilotList.length + 1}`,
+        x,
+        y,
+        width: typeConfig.width,
+        height: typeConfig.height,
+        type: typeName,
+        color: typeConfig.color,
+        area: typeConfig.area,
+        rotation: (Math.random() - 0.5) * 30
+      };
+      
+      if (isValidPlacement(newIlot, ilotList, floorPlan)) {
+        ilotList.push(newIlot);
+        placedArea += typeConfig.area;
+      }
+      
+      attempts++;
+    }
+    
+    return ilotList;
+  };
+
+  const generateIlots = useCallback(() => {
+    if (!floorPlan) return [];
+    
+    const { bounds, usableArea } = floorPlan;
+    const targetArea = (usableArea * settings.density) / 100;
+    
+    let ilotList = [];
+    
+    switch (settings.algorithm) {
+      case 'intelligent':
+        ilotList = generateIntelligentLayout(bounds, targetArea);
+        break;
+      case 'grid':
+        ilotList = generateGridLayout(bounds, targetArea);
+        break;
+      case 'organic':
+        ilotList = generateOrganicLayout(bounds, targetArea);
+        break;
+      default:
+        ilotList = generateIntelligentLayout(bounds, targetArea);
+    }
+    
+    return ilotList;
+  }, [floorPlan, settings]);
+
+  const generateCorridors = useCallback((ilotList) => {
+    const corridorList = [];
+    
+    if (!floorPlan || !floorPlan.doors || floorPlan.doors.length === 0) {
+      return corridorList;
+    }
+    
+    // Create circulation network
+    const mainEntrance = floorPlan.doors.find(door => door.type === 'main') || floorPlan.doors[0];
+    const entrancePoint = [
+      (mainEntrance.points[0][0] + mainEntrance.points[1][0]) / 2,
+      (mainEntrance.points[0][1] + mainEntrance.points[1][1]) / 2
+    ];
+    
+    // Main circulation spine
+    const spineWidth = settings.corridorWidth * 40;
+    const spineLength = Math.min(400, floorPlan.bounds.maxY - floorPlan.bounds.minY - 100);
+    
+    corridorList.push({
+      id: 'main_corridor',
+      x: entrancePoint[0] - spineWidth / 2,
+      y: entrancePoint[1],
+      width: spineWidth,
+      height: spineLength,
+      type: 'main',
+      flow: 100
+    });
+    
+    // Secondary corridors to connect ilot clusters
+    const clusters = identifyIlotClusters(ilotList);
+    clusters.forEach((cluster, index) => {
+      const corridorWidth = settings.corridorWidth * 30;
+      
+      // Horizontal connector
+      if (cluster.bounds.maxX < floorPlan.bounds.maxX - 100) {
+        corridorList.push({
+          id: `secondary_h_${index}`,
+          x: cluster.bounds.maxX,
+          y: cluster.center.y - corridorWidth / 2,
+          width: Math.min(150, floorPlan.bounds.maxX - cluster.bounds.maxX - 50),
+          height: corridorWidth,
+          type: 'secondary',
+          flow: cluster.ilots.length * 10
+        });
+      }
+      
+      // Vertical connector
+      if (cluster.bounds.maxY < floorPlan.bounds.maxY - 100) {
+        corridorList.push({
+          id: `secondary_v_${index}`,
+          x: cluster.center.x - corridorWidth / 2,
+          y: cluster.bounds.maxY,
+          width: corridorWidth,
+          height: Math.min(150, floorPlan.bounds.maxY - cluster.bounds.maxY - 50),
+          type: 'secondary',
+          flow: cluster.ilots.length * 10
+        });
+      }
+    });
+    
+    return corridorList;
+  }, [floorPlan, settings]);
+
+  const identifyIlotClusters = (ilotList) => {
+    const clusters = [];
+    const processed = new Set();
+    const clusterRadius = 200;
+    
+    ilotList.forEach((ilot, index) => {
+      if (processed.has(index)) return;
+      
+      const cluster = {
+        ilots: [ilot],
+        center: { x: ilot.x + ilot.width / 2, y: ilot.y + ilot.height / 2 },
+        bounds: {
+          minX: ilot.x,
+          minY: ilot.y,
+          maxX: ilot.x + ilot.width,
+          maxY: ilot.y + ilot.height
+        }
+      };
+      
+      processed.add(index);
+      
+      // Find nearby ilots
+      ilotList.forEach((otherIlot, otherIndex) => {
+        if (processed.has(otherIndex)) return;
+        
+        const distance = Math.sqrt(
+          Math.pow(otherIlot.x + otherIlot.width / 2 - cluster.center.x, 2) +
+          Math.pow(otherIlot.y + otherIlot.height / 2 - cluster.center.y, 2)
+        );
+        
+        if (distance <= clusterRadius) {
+          cluster.ilots.push(otherIlot);
+          processed.add(otherIndex);
+          
+          // Update cluster bounds
+          cluster.bounds.minX = Math.min(cluster.bounds.minX, otherIlot.x);
+          cluster.bounds.minY = Math.min(cluster.bounds.minY, otherIlot.y);
+          cluster.bounds.maxX = Math.max(cluster.bounds.maxX, otherIlot.x + otherIlot.width);
+          cluster.bounds.maxY = Math.max(cluster.bounds.maxY, otherIlot.y + otherIlot.height);
+          
+          // Recalculate center
+          cluster.center.x = (cluster.bounds.minX + cluster.bounds.maxX) / 2;
+          cluster.center.y = (cluster.bounds.minY + cluster.bounds.maxY) / 2;
+        }
+      });
+      
+      clusters.push(cluster);
+    });
+    
+    return clusters;
+  };
+
+  // Analytics calculations
+  const calculateAccessibilityScore = () => {
+    if (!ilots.length) return 0;
+    
+    let accessibleIlots = 0;
+    ilots.forEach(ilot => {
+      if (checkAccessibilityCompliance(ilot, floorPlan)) {
+        accessibleIlots++;
+      }
+    });
+    
+    return (accessibleIlots / ilots.length) * 100;
+  };
+
+  const calculateFireComplianceScore = () => {
+    if (!ilots.length || !floorPlan || !floorPlan.doors) return 0;
+    
+    let compliantIlots = 0;
+    ilots.forEach(ilot => {
+      const nearestExit = Math.min(...floorPlan.doors.map(door => {
+        const doorCenter = [(door.points[0][0] + door.points[1][0]) / 2, (door.points[0][1] + door.points[1][1]) / 2];
+        const ilotCenter = [ilot.x + ilot.width / 2, ilot.y + ilot.height / 2];
+        return Math.sqrt(Math.pow(doorCenter[0] - ilotCenter[0], 2) + Math.pow(doorCenter[1] - ilotCenter[1], 2));
+      }));
+      
+      if (nearestExit <= settings.exitDistance * 3) {
+        compliantIlots++;
+      }
+    });
+    
+    return (compliantIlots / ilots.length) * 100;
+  };
+
+  const calculateCirculationScore = () => {
+    if (!ilots.length || !corridors.length) return 0;
+    
+    let totalFlow = 0;
+    let optimalFlow = 0;
+    
+    // Calculate actual circulation flows
+    corridors.forEach(corridor => {
+      const proximityIlots = ilots.filter(ilot => {
+        const distance = Math.sqrt(
+          Math.pow(ilot.x + ilot.width / 2 - (corridor.x + corridor.width / 2), 2) +
+          Math.pow(ilot.y + ilot.height / 2 - (corridor.y + corridor.height / 2), 2)
+        );
+        return distance <= 150;
+      });
+      
+      const expectedFlow = proximityIlots.length * 5;
+      totalFlow += Math.min(corridor.flow || 0, expectedFlow);
+      optimalFlow += expectedFlow;
+    });
+    
+    // Factor in corridor width adequacy
+    const adequateWidthCorridors = corridors.filter(corridor => {
+      const width = Math.min(corridor.width, corridor.height);
+      return width >= settings.corridorWidth * 30;
+    }).length;
+    
+    const widthScore = corridors.length > 0 ? (adequateWidthCorridors / corridors.length) * 100 : 100;
+    const flowScore = optimalFlow > 0 ? (totalFlow / optimalFlow) * 100 : 100;
+    
+    return (flowScore * 0.7 + widthScore * 0.3);
+  };
+
+  const calculateAnalytics = useCallback(() => {
+    if (!floorPlan || !ilots.length) return;
+    
+    const totalIlotArea = ilots.reduce((sum, ilot) => sum + ilot.area, 0);
+    const totalCorridorArea = corridors.reduce((sum, corridor) => sum + (corridor.width * corridor.height) / 100, 0);
+    
+    const newAnalytics = {
+      totalArea: floorPlan.totalArea / 100,
+      usableArea: floorPlan.usableArea / 100,
+      ilotArea: totalIlotArea,
+      corridorArea: totalCorridorArea,
+      efficiency: floorPlan.usableArea > 0 ? (totalIlotArea / (floorPlan.usableArea / 100)) * 100 : 0,
+      accessibility: calculateAccessibilityScore(),
+      fireCompliance: calculateFireComplianceScore(),
+      circulation: calculateCirculationScore()
+    };
+    
+    setAnalytics(newAnalytics);
+  }, [floorPlan, ilots, corridors, settings]);
+
+  // DXF parsing functions
+  const parseDXF = async (dxfContent) => {
+    const lines = dxfContent.split('\n').map(line => line.trim());
+    const entities = [];
+    let currentEntity = null;
+    let currentCode = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line === 'ENTITIES') {
+        continue;
+      } else if (line === 'ENDSEC') {
+        break;
+      } else if (!isNaN(parseInt(line))) {
+        currentCode = parseInt(line);
+      } else {
+        if (currentCode === 0) {
+          // Start new entity
+          if (currentEntity) {
+            entities.push(currentEntity);
+          }
+          currentEntity = { type: line, properties: {} };
+        } else if (currentEntity) {
+          // Add property to current entity
+          switch (currentCode) {
+            case 10: currentEntity.properties.x1 = parseFloat(line); break;
+            case 20: currentEntity.properties.y1 = parseFloat(line); break;
+            case 11: currentEntity.properties.x2 = parseFloat(line); break;
+            case 21: currentEntity.properties.y2 = parseFloat(line); break;
+            case 40: currentEntity.properties.radius = parseFloat(line); break;
+            case 50: currentEntity.properties.startAngle = parseFloat(line); break;
+            case 51: currentEntity.properties.endAngle = parseFloat(line); break;
+            case 8: currentEntity.properties.layer = line; break;
+            case 62: currentEntity.properties.color = parseInt(line); break;
+            case 39: currentEntity.properties.thickness = parseFloat(line); break;
+          }
+        }
+      }
+    }
+    
+    if (currentEntity) {
+      entities.push(currentEntity);
+    }
+    
+    return entities;
+  };
+
+  const processDXFEntities = (entities) => {
+    const walls = [];
+    const doors = [];
+    const windows = [];
+    let bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    
+    entities.forEach((entity, index) => {
+      const { type, properties } = entity;
+      
+      switch (type) {
+        case 'LINE':
+          if (properties.x1 !== undefined && properties.y1 !== undefined && 
+              properties.x2 !== undefined && properties.y2 !== undefined) {
+            
+            const thickness = properties.thickness || (properties.layer?.toLowerCase().includes('wall') ? 5 : 2);
+            const isWall = properties.layer?.toLowerCase().includes('wall') || thickness > 3;
+            
+            if (isWall) {
+              walls.push({
+                id: `dxf_wall_${index}`,
+                points: [[properties.x1, properties.y1], [properties.x2, properties.y2]],
+                type: thickness > 8 ? 'exterior' : 'interior',
+                thickness: thickness,
+                confidence: 100,
+                layer: properties.layer
+              });
+            }
+            
+            // Update bounds
+            bounds.minX = Math.min(bounds.minX, properties.x1, properties.x2);
+            bounds.maxX = Math.max(bounds.maxX, properties.x1, properties.x2);
+            bounds.minY = Math.min(bounds.minY, properties.y1, properties.y2);
+            bounds.maxY = Math.max(bounds.maxY, properties.y1, properties.y2);
+          }
+          break;
+          
+        case 'POLYLINE':
+        case 'LWPOLYLINE':
+          // Handle polylines as connected wall segments
+          if (properties.vertices) {
+            for (let i = 0; i < properties.vertices.length - 1; i++) {
+              const v1 = properties.vertices[i];
+              const v2 = properties.vertices[i + 1];
+              
+              walls.push({
+                id: `dxf_polywall_${index}_${i}`,
+                points: [[v1.x, v1.y], [v2.x, v2.y]],
+                type: 'interior',
+                thickness: properties.thickness || 3,
+                confidence: 100,
+                layer: properties.layer
+              });
+              
+              bounds.minX = Math.min(bounds.minX, v1.x, v2.x);
+              bounds.maxX = Math.max(bounds.maxX, v1.x, v2.x);
+              bounds.minY = Math.min(bounds.minY, v1.y, v2.y);
+              bounds.maxY = Math.max(bounds.maxY, v1.y, v2.y);
+            }
+          }
+          break;
+          
+        case 'ARC':
+        case 'CIRCLE':
+          // Convert arcs/circles to approximate line segments for doors/windows
+          if (properties.radius && properties.radius < 100) {
+            const centerX = properties.x1 || 0;
+            const centerY = properties.y1 || 0;
+            const radius = properties.radius;
+            
+            const startAngle = properties.startAngle || 0;
+            const endAngle = properties.endAngle || 360;
+            const arcLength = ((endAngle - startAngle) / 180) * Math.PI * radius;
+            
+            if (arcLength < 200) { // Likely a door swing
+              doors.push({
+                id: `dxf_door_${index}`,
+                points: [
+                  [centerX - radius, centerY],
+                  [centerX + radius, centerY]
+                ],
+                type: radius > 40 ? 'main' : 'interior',
+                swing: 'arc',
+                width: radius * 2,
+                confidence: 90,
+                layer: properties.layer
+              });
+            }
+          }
+          break;
+          
+        case 'INSERT':
+          // Handle door/window blocks
+          const blockName = properties.blockName?.toLowerCase() || '';
+          if (blockName.includes('door')) {
+            doors.push({
+              id: `dxf_block_door_${index}`,
+              points: [
+                [properties.x1 - 50, properties.y1],
+                [properties.x1 + 50, properties.y1]
+              ],
+              type: blockName.includes('main') ? 'main' : 'interior',
+              swing: 'inward',
+              width: 100,
+              confidence: 95,
+              layer: properties.layer
+            });
+          } else if (blockName.includes('window')) {
+            windows.push({
+              id: `dxf_block_window_${index}`,
+              points: [
+                [properties.x1 - 60, properties.y1],
+                [properties.x1 + 60, properties.y1]
+              ],
+              type: 'fixed',
+              width: 120,
+              confidence: 95,
+              layer: properties.layer
+            });
+          }
+          break;
+      }
+    });
+    
+    // Normalize bounds
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    
+    // Scale to reasonable viewport size
+    const scale = Math.min(800 / width, 600 / height);
+    const scaledBounds = {
+      minX: 0,
+      minY: 0,
+      maxX: width * scale,
+      maxY: height * scale
+    };
+    
+    // Transform all coordinates
+    const transform = (point) => [
+      (point[0] - bounds.minX) * scale,
+      (point[1] - bounds.minY) * scale
+    ];
+    
+    walls.forEach(wall => {
+      wall.points = wall.points.map(transform);
+    });
+    
+    doors.forEach(door => {
+      door.points = door.points.map(transform);
+    });
+    
+    windows.forEach(window => {
+      window.points = window.points.map(transform);
+    });
+    
+    return { walls, doors, windows, bounds: scaledBounds, width: width * scale, height: height * scale };
+  };
+
+  // File handling
+  const handleFileUpload = (event) => {
+    const uploadedFile = event.target.files[0];
+    if (uploadedFile) {
+      const fileName = uploadedFile.name.toLowerCase();
+      if (uploadedFile.type.startsWith('image/') || fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        setFile(uploadedFile);
+        setCurrentView('processing');
+        processFloorPlan(uploadedFile);
+      } else if (fileName.endsWith('.dxf')) {
+        setFile(uploadedFile);
+        setCurrentView('processing');
+        processDXFFile(uploadedFile);
+      }
+    }
+  };
+
+  const processDXFFile = async (dxfFile) => {
+    setProcessing(true);
+    setProcessingProgress(0);
+    setProcessingStage('Reading DXF file...');
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dxfContent = e.target.result;
+        
+        setProcessingStage('Parsing DXF entities...');
+        setProcessingProgress(25);
+        
+        const entities = await parseDXF(dxfContent);
+        
+        setProcessingStage('Processing geometry...');
+        setProcessingProgress(50);
+        
+        const { walls, doors, windows, bounds, width, height } = processDXFEntities(entities);
+        
+        setProcessingStage('Analyzing space usage...');
+        setProcessingProgress(75);
+        
+        // Calculate areas based on DXF geometry
+        const totalArea = width * height;
+        const wallArea = walls.reduce((sum, wall) => {
+          const length = Math.sqrt(
+            Math.pow(wall.points[1][0] - wall.points[0][0], 2) +
+            Math.pow(wall.points[1][1] - wall.points[0][1], 2)
+          );
+          return sum + (length * (wall.thickness || 5));
+        }, 0);
+        
+        const usableArea = totalArea - wallArea;
+        
+        setProcessingStage('Generating floor plan...');
+        setProcessingProgress(90);
+        
+        const plan = {
+          totalArea,
+          usableArea,
+          bounds,
+          walls,
+          doors,
+          windows,
+          restrictedAreas: [],
+          isDXF: true,
+          entities: entities.length
+        };
+        
+        setFloorPlan(plan);
+        setProcessingProgress(100);
+        setProcessingStage('Complete');
+        
+        setTimeout(() => {
+          setProcessing(false);
+          setCurrentView('editor');
+          setViewBox({ x: 0, y: 0, width, height, scale: 1 });
+        }, 500);
+      };
+      
+      reader.readAsText(dxfFile);
+    } catch (error) {
+      console.error('Error processing DXF file:', error);
+      setProcessing(false);
+      setProcessingStage('Error processing DXF file');
+    }
+  };
+
+  const processFloorPlan = async (imageFile) => {
+    setProcessing(true);
+    setProcessingProgress(0);
+    setProcessingStage('Loading image...');
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const imageData = e.target.result;
+        const img = new Image();
+        
+        img.onload = async () => {
+          const width = img.width;
+          const height = img.height;
+          
+          setProcessingStage('Analyzing structure...');
+          setProcessingProgress(20);
+          
+          // Analyze walls
+          const walls = await analyzeImageForWalls(imageData, width, height);
+          
+          setProcessingStage('Detecting openings...');
+          setProcessingProgress(40);
+          
+          // Get image data for door/window detection
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          const imgData = ctx.getImageData(0, 0, width, height);
+          
+          const { doors, windows } = detectDoorsAndWindows(imgData.data, walls, width, height);
+          
+          setProcessingStage('Analyzing space usage...');
+          setProcessingProgress(60);
+          
+          const spaceAnalysis = analyzeSpaceUsage(walls, doors, windows, width, height);
+          
+          setProcessingStage('Generating floor plan...');
+          setProcessingProgress(80);
+          
+          const plan = {
+            ...spaceAnalysis,
+            walls,
+            doors,
+            windows,
+            image: imageData,
+            restrictedAreas: []
+          };
+          
+          setFloorPlan(plan);
+          setProcessingProgress(100);
+          setProcessingStage('Complete');
+          
+          setTimeout(() => {
+            setProcessing(false);
+            setCurrentView('editor');
+            setViewBox({ x: 0, y: 0, width, height, scale: 1 });
+          }, 500);
+        };
+        
+        img.src = imageData;
+      };
+      
+      reader.readAsDataURL(imageFile);
+    } catch (error) {
+      console.error('Error processing floor plan:', error);
+      setProcessing(false);
+    }
+  };
+
+  // Generate layout
+  const handleGenerateLayout = () => {
+    if (!floorPlan) return;
+    
+    setProcessing(true);
+    setProcessingStage('Generating layout...');
+    
+    setTimeout(() => {
+      const newIlots = generateIlots();
+      const newCorridors = generateCorridors(newIlots);
+      
+      setIlots(newIlots);
+      setCorridors(newCorridors);
+      setProcessing(false);
+    }, 1000);
+  };
+
+  // Tool handlers
+  const handleToolChange = (tool) => {
+    setSelectedTool(tool);
+    setSelectedElements([]);
+  };
+
+  const handleElementClick = (elementId, elementType) => {
+    if (selectedTool === 'select') {
+      setSelectedElements(prev => 
+        prev.includes(elementId) 
+          ? prev.filter(id => id !== elementId)
+          : [...prev, elementId]
+      );
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedElements.length === 0) return;
+    
+    setIlots(prev => prev.filter(ilot => !selectedElements.includes(ilot.id)));
+    setCorridors(prev => prev.filter(corridor => !selectedElements.includes(corridor.id)));
+    setSelectedElements([]);
+  };
+
+  // Zoom and pan
+  const handleZoom = (factor) => {
+    setViewBox(prev => ({
+      ...prev,
+      scale: Math.max(0.1, Math.min(5, prev.scale * factor))
+    }));
+  };
+
+  const handleResetView = () => {
+    if (floorPlan) {
+      setViewBox({
+        x: 0,
+        y: 0,
+        width: floorPlan.bounds.maxX,
+        height: floorPlan.bounds.maxY,
+        scale: 1
+      });
+    }
+  };
+
+  // Export functions
+  const exportToJSON = () => {
+    const data = {
+      floorPlan,
+      ilots,
+      corridors,
+      settings,
+      analytics,
+      timestamp: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'floor_plan_analysis.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = () => {
+    // This would integrate with a PDF library like jsPDF
+    alert('PDF export functionality would be implemented with jsPDF library');
+  };
+
+  // Update analytics when data changes
+  useEffect(() => {
+    calculateAnalytics();
+  }, [calculateAnalytics]);
+
+  // Render functions
+  const renderUploadView = () => (
+    <div className="flex flex-col items-center justify-center h-full bg-gray-50">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+        <div className="text-center mb-6">
+          <Upload className="mx-auto h-12 w-12 text-blue-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Floor Plan</h2>
+          <p className="text-gray-600">Upload an image of your floor plan to begin analysis</p>
+        </div>
+        
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.dxf"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium"
+          >
+            Choose File
+          </button>
+          <p className="text-sm text-gray-500 mt-2">PNG, JPG, DXF, PDF supported</p>
+        </div>
+        
+        <div className="mt-6 text-sm text-gray-600">
+          <p className="font-medium mb-2">Supported formats:</p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>DXF CAD files (recommended)</li>
+            <li>Architectural drawings</li>
+            <li>CAD exports (PNG/JPG)</li>
+            <li>Hand-drawn sketches</li>
+            <li>PDF floor plans</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProcessingView = () => (
+    <div className="flex flex-col items-center justify-center h-full bg-gray-50">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+        <div className="text-center mb-6">
+          <RefreshCw className="mx-auto h-12 w-12 text-blue-500 mb-4 animate-spin" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing Floor Plan</h2>
+          <p className="text-gray-600">{processingStage}</p>
+        </div>
+        
+        <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+          <div 
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${processingProgress}%` }}
+          />
+        </div>
+        
+        <div className="text-center text-sm text-gray-500">
+          {processingProgress}% complete
+        </div>
+        
+        <div className="mt-6 text-sm text-gray-600">
+          <p className="font-medium mb-2">Processing steps:</p>
+          <ul className="space-y-1">
+            <li className={`flex items-center ${processingProgress >= 20 ? 'text-green-600' : ''}`}>
+              {processingProgress >= 20 ? <CheckCircle className="w-4 h-4 mr-2" /> : <div className="w-4 h-4 mr-2" />}
+              Analyzing structure
+            </li>
+            <li className={`flex items-center ${processingProgress >= 40 ? 'text-green-600' : ''}`}>
+              {processingProgress >= 40 ? <CheckCircle className="w-4 h-4 mr-2" /> : <div className="w-4 h-4 mr-2" />}
+              Detecting openings
+            </li>
+            <li className={`flex items-center ${processingProgress >= 60 ? 'text-green-600' : ''}`}>
+              {processingProgress >= 60 ? <CheckCircle className="w-4 h-4 mr-2" /> : <div className="w-4 h-4 mr-2" />}
+              Analyzing space usage
+            </li>
+            <li className={`flex items-center ${processingProgress >= 100 ? 'text-green-600' : ''}`}>
+              {processingProgress >= 100 ? <CheckCircle className="w-4 h-4 mr-2" /> : <div className="w-4 h-4 mr-2" />}
+              Generating floor plan
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderToolbar = () => (
+    <div className="bg-white border-b border-gray-200 px-4 py-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          {/* File operations */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            <Upload className="w-4 h-4 mr-1" />
+            Upload
+          </button>
+          
+          <button
+            onClick={exportToJSON}
+            className="flex items-center px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Export
+          </button>
+          
+          <div className="h-6 w-px bg-gray-300" />
+          
+          {/* Tools */}
+          {[
+            { id: 'select', icon: MousePointer, label: 'Select' },
+            { id: 'move', icon: Move, label: 'Move' },
+            { id: 'rotate', icon: RotateCw, label: 'Rotate' },
+            { id: 'measure', icon: Ruler, label: 'Measure' }
+          ].map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => handleToolChange(tool.id)}
+              className={`flex items-center px-3 py-2 text-sm rounded ${
+                selectedTool === tool.id
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <tool.icon className="w-4 h-4 mr-1" />
+              {tool.label}
+            </button>
+          ))}
+          
+          <div className="h-6 w-px bg-gray-300" />
+          
+          {/* Actions */}
+          <button
+            onClick={handleGenerateLayout}
+            disabled={!floorPlan || processing}
+            className="flex items-center px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+          >
+            <Play className="w-4 h-4 mr-1" />
+            Generate
+          </button>
+          
+          <button
+            onClick={() => {
+              setIlots([]);
+              setCorridors([]);
+            }}
+            className="flex items-center px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            <RotateCcw className="w-4 h-4 mr-1" />
+            Clear
+          </button>
+          
+          {selectedElements.length > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="flex items-center px-3 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete ({selectedElements.length})
+            </button>
+          )}
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {/* View controls */}
+          <button
+            onClick={() => handleZoom(1.2)}
+            className="p-2 text-gray-700 hover:bg-gray-100 rounded"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => handleZoom(0.8)}
+            className="p-2 text-gray-700 hover:bg-gray-100 rounded"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={handleResetView}
+            className="p-2 text-gray-700 hover:bg-gray-100 rounded"
+          >
+            <Target className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => setShowGrid(!showGrid)}
+            className={`p-2 rounded ${showGrid ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}
+          >
+            <Grid className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderLayerPanel = () => (
+    <div className="w-64 bg-white border-l border-gray-200 p-4">
+      <h3 className="font-medium text-gray-900 mb-4 flex items-center">
+        <Layers className="w-4 h-4 mr-2" />
+        Layers
+      </h3>
+      
+      <div className="space-y-2">
+        {Object.entries(layerVisibility).map(([layer, visible]) => (
+          <div key={layer} className="flex items-center justify-between">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={visible}
+                onChange={(e) => setLayerVisibility(prev => ({
+                  ...prev,
+                  [layer]: e.target.checked
+                }))}
+                className="mr-2"
+              />
+              <span className="text-sm capitalize">{layer.replace(/([A-Z])/g, ' $1')}</span>
+            </label>
+            {visible ? <Eye className="w-4 h-4 text-green-500" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+          </div>
+        ))}
+      </div>
+      
+      <div className="mt-6">
+        <h4 className="font-medium text-gray-900 mb-3">Analytics</h4>
+        <div className="space-y-3">
+          <div className="bg-gray-50 rounded p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Efficiency</span>
+              <span className="text-sm font-medium">{analytics.efficiency.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full"
+                style={{ width: `${Math.min(100, analytics.efficiency)}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Accessibility</span>
+              <span className="text-sm font-medium">{analytics.accessibility.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-green-500 h-2 rounded-full"
+                style={{ width: `${analytics.accessibility}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Fire Safety</span>
+              <span className="text-sm font-medium">{analytics.fireCompliance.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-red-500 h-2 rounded-full"
+                style={{ width: `${analytics.fireCompliance}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Circulation</span>
+              <span className="text-sm font-medium">{analytics.circulation.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-purple-500 h-2 rounded-full"
+                style={{ width: `${analytics.circulation}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 text-xs text-gray-500 space-y-1">
+          <div className="flex justify-between">
+            <span>Total Area:</span>
+            <span>{analytics.totalArea.toFixed(1)} m²</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Usable Area:</span>
+            <span>{analytics.usableArea.toFixed(1)} m²</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Ilot Area:</span>
+            <span>{analytics.ilotArea.toFixed(1)} m²</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Ilots Count:</span>
+            <span>{ilots.length}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSettingsPanel = () => (
+    <div className="w-80 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+      <h3 className="font-medium text-gray-900 mb-4 flex items-center">
+        <Settings className="w-4 h-4 mr-2" />
+        Settings
+      </h3>
+      
+      <div className="space-y-6">
+        {/* Layout Algorithm */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Layout Algorithm</label>
+          <select
+            value={settings.algorithm}
+            onChange={(e) => setSettings(prev => ({ ...prev, algorithm: e.target.value }))}
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+          >
+            <option value="intelligent">Intelligent Placement</option>
+            <option value="grid">Grid Pattern</option>
+            <option value="organic">Organic Distribution</option>
+          </select>
+        </div>
+        
+        {/* Density */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Density: {settings.density}%
+          </label>
+          <input
+            type="range"
+            min="10"
+            max="50"
+            value={settings.density}
+            onChange={(e) => setSettings(prev => ({ ...prev, density: parseInt(e.target.value) }))}
+            className="w-full"
+          />
+        </div>
+        
+        {/* Priority */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+          <select
+            value={settings.priority}
+            onChange={(e) => setSettings(prev => ({ ...prev, priority: e.target.value }))}
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+          >
+            <option value="area">Maximize Area</option>
+            <option value="efficiency">Optimize Efficiency</option>
+            <option value="accessibility">Prioritize Access</option>
+          </select>
+        </div>
+        
+        {/* Clearances */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Min Clearance: {settings.minClearance}m
+          </label>
+          <input
+            type="range"
+            min="0.5"
+            max="2.0"
+            step="0.1"
+            value={settings.minClearance}
+            onChange={(e) => setSettings(prev => ({ ...prev, minClearance: parseFloat(e.target.value) }))}
+            className="w-full"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Corridor Width: {settings.corridorWidth}m
+          </label>
+          <input
+            type="range"
+            min="1.0"
+            max="3.0"
+            step="0.1"
+            value={settings.corridorWidth}
+            onChange={(e) => setSettings(prev => ({ ...prev, corridorWidth: parseFloat(e.target.value) }))}
+            className="w-full"
+          />
+        </div>
+        
+        {/* Ilot Sizes */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Ilot Sizes</label>
+          {Object.entries(settings.ilotSizes).map(([size, config]) => (
+            <div key={size} className="mb-3 p-3 border border-gray-200 rounded">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium capitalize">{size}</span>
+                <div 
+                  className="w-4 h-4 rounded"
+                  style={{ backgroundColor: config.color }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-gray-600">Width (cm)</label>
+                  <input
+                    type="number"
+                    value={config.width}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      ilotSizes: {
+                        ...prev.ilotSizes,
+                        [size]: {
+                          ...prev.ilotSizes[size],
+                          width: parseInt(e.target.value),
+                          area: (parseInt(e.target.value) * prev.ilotSizes[size].height) / 10000
+                        }
+                      }
+                    }))}
+                    className="w-full border border-gray-300 rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600">Height (cm)</label>
+                  <input
+                    type="number"
+                    value={config.height}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      ilotSizes: {
+                        ...prev.ilotSizes,
+                        [size]: {
+                          ...prev.ilotSizes[size],
+                          height: parseInt(e.target.value),
+                          area: (prev.ilotSizes[size].width * parseInt(e.target.value)) / 10000
+                        }
+                      }
+                    }))}
+                    className="w-full border border-gray-300 rounded px-2 py-1"
+                  />
+                </div>
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                Area: {config.area.toFixed(1)} m²
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Compliance */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Compliance</label>
+          <div className="space-y-2">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.fireRegulations}
+                onChange={(e) => setSettings(prev => ({ ...prev, fireRegulations: e.target.checked }))}
+                className="mr-2"
+              />
+              <span className="text-sm">Fire Safety Regulations</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.accessibilityCompliance}
+                onChange={(e) => setSettings(prev => ({ ...prev, accessibilityCompliance: e.target.checked }))}
+                className="mr-2"
+              />
+              <span className="text-sm">Accessibility Standards</span>
+            </label>
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Exit Distance: {settings.exitDistance}m
+          </label>
+          <input
+            type="range"
+            min="20"
+            max="100"
+            value={settings.exitDistance}
+            onChange={(e) => setSettings(prev => ({ ...prev, exitDistance: parseInt(e.target.value) }))}
+            className="w-full"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMainEditor = () => {
+    if (!floorPlan) return null;
+    
+    const { scale } = viewBox;
+    const svgWidth = floorPlan.bounds.maxX * scale;
+    const svgHeight = floorPlan.bounds.maxY * scale;
+    
+    return (
+      <div className="flex-1 bg-gray-100 overflow-hidden relative">
+        <div className="w-full h-full overflow-auto">
+          <svg
+            ref={canvasRef}
+            width={svgWidth}
+            height={svgHeight}
+            viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+            className="bg-white"
+            style={{ minWidth: '100%', minHeight: '100%' }}
+          >
+            {/* Grid */}
+            {showGrid && layerVisibility.grid && (
+              <defs>
+                <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e5e7eb" strokeWidth="1"/>
+                </pattern>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+              </defs>
+            )}
+            
+            {/* Background - DXF gets light gray background instead of image */}
+            {floorPlan.isDXF ? (
+              <rect
+                width={floorPlan.bounds.maxX}
+                height={floorPlan.bounds.maxY}
+                fill="#f9fafb"
+                stroke="#e5e7eb"
+                strokeWidth="1"
+              />
+            ) : floorPlan.image && (
+              <image
+                href={floorPlan.image}
+                x="0"
+                y="0"
+                width={floorPlan.bounds.maxX}
+                height={floorPlan.bounds.maxY}
+                opacity="0.3"
+              />
+            )}
+            
+            {/* Walls */}
+            {layerVisibility.walls && floorPlan.walls?.map(wall => (
+              <line
+                key={wall.id}
+                x1={wall.points[0][0]}
+                y1={wall.points[0][1]}
+                x2={wall.points[1][0]}
+                y2={wall.points[1][1]}
+                stroke={wall.type === 'exterior' ? '#1f2937' : '#6b7280'}
+                strokeWidth={wall.thickness || 3}
+                strokeLinecap="round"
+              />
+            ))}
+            
+            {/* Doors */}
+            {layerVisibility.doors && floorPlan.doors?.map(door => (
+              <g key={door.id}>
+                <line
+                  x1={door.points[0][0]}
+                  y1={door.points[0][1]}
+                  x2={door.points[1][0]}
+                  y2={door.points[1][1]}
+                  stroke={door.type === 'main' ? '#dc2626' : '#f59e0b'}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+                {layerVisibility.labels && (
+                  <text
+                    x={(door.points[0][0] + door.points[1][0]) / 2}
+                    y={(door.points[0][1] + door.points[1][1]) / 2 - 10}
+                    fontSize="12"
+                    fill="#374151"
+                    textAnchor="middle"
+                    className="pointer-events-none"
+                  >
+                    {door.type === 'main' ? 'Main' : 'Door'}
+                  </text>
+                )}
+              </g>
+            ))}
+            
+            {/* Windows */}
+            {layerVisibility.windows && floorPlan.windows?.map(window => (
+              <line
+                key={window.id}
+                x1={window.points[0][0]}
+                y1={window.points[0][1]}
+                x2={window.points[1][0]}
+                y2={window.points[1][1]}
+                stroke="#3b82f6"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            ))}
+            
+            {/* Corridors */}
+            {layerVisibility.corridors && corridors.map(corridor => (
+              <g key={corridor.id}>
+                <rect
+                  x={corridor.x}
+                  y={corridor.y}
+                  width={corridor.width}
+                  height={corridor.height}
+                  fill={corridor.type === 'main' ? '#ddd6fe' : '#e0e7ff'}
+                  stroke={corridor.type === 'main' ? '#8b5cf6' : '#6366f1'}
+                  strokeWidth="2"
+                  strokeDasharray={corridor.type === 'main' ? '0' : '5,5'}
+                  onClick={() => handleElementClick(corridor.id, 'corridor')}
+                  className={`cursor-pointer ${selectedElements.includes(corridor.id) ? 'opacity-80' : ''}`}
+                />
+                {selectedElements.includes(corridor.id) && (
+                  <rect
+                    x={corridor.x - 5}
+                    y={corridor.y - 5}
+                    width={corridor.width + 10}
+                    height={corridor.height + 10}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    strokeDasharray="3,3"
+                  />
+                )}
+                {layerVisibility.labels && (
+                  <text
+                    x={corridor.x + corridor.width / 2}
+                    y={corridor.y + corridor.height / 2}
+                    fontSize="10"
+                    fill="#4b5563"
+                    textAnchor="middle"
+                    className="pointer-events-none"
+                  >
+                    {corridor.type}
+                  </text>
+                )}
+              </g>
+            ))}
+            
+            {/* Ilots */}
+            {layerVisibility.ilots && ilots.map(ilot => (
+              <g key={ilot.id}>
+                <rect
+                  x={ilot.x}
+                  y={ilot.y}
+                  width={ilot.width}
+                  height={ilot.height}
+                  fill={ilot.color}
+                  stroke="#374151"
+                  strokeWidth="2"
+                  transform={ilot.rotation ? `rotate(${ilot.rotation}, ${ilot.x + ilot.width/2}, ${ilot.y + ilot.height/2})` : ''}
+                  onClick={() => handleElementClick(ilot.id, 'ilot')}
+                  className={`cursor-pointer hover:opacity-80 ${selectedElements.includes(ilot.id) ? 'opacity-70' : ''}`}
+                />
+                {selectedElements.includes(ilot.id) && (
+                  <rect
+                    x={ilot.x - 5}
+                    y={ilot.y - 5}
+                    width={ilot.width + 10}
+                    height={ilot.height + 10}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    transform={ilot.rotation ? `rotate(${ilot.rotation}, ${ilot.x + ilot.width/2}, ${ilot.y + ilot.height/2})` : ''}
+                  />
+                )}
+                {layerVisibility.labels && (
+                  <text
+                    x={ilot.x + ilot.width / 2}
+                    y={ilot.y + ilot.height / 2}
+                    fontSize="12"
+                    fill="#1f2937"
+                    textAnchor="middle"
+                    className="pointer-events-none font-medium"
+                    transform={ilot.rotation ? `rotate(${ilot.rotation}, ${ilot.x + ilot.width/2}, ${ilot.y + ilot.height/2})` : ''}
+                  >
+                    {ilot.type}
+                  </text>
+                )}
+                {layerVisibility.measurements && (
+                  <text
+                    x={ilot.x + ilot.width / 2}
+                    y={ilot.y + ilot.height / 2 + 15}
+                    fontSize="10"
+                    fill="#6b7280"
+                    textAnchor="middle"
+                    className="pointer-events-none"
+                    transform={ilot.rotation ? `rotate(${ilot.rotation}, ${ilot.x + ilot.width/2}, ${ilot.y + ilot.height/2})` : ''}
+                  >
+                    {ilot.area.toFixed(1)}m²
+                  </text>
+                )}
+              </g>
+            ))}
+            
+            {/* Heatmap overlay */}
+            {layerVisibility.heatmap && (
+              <g opacity="0.6">
+                {ilots.map(ilot => {
+                  const intensity = Math.min(1, ilot.area / 20);
+                  return (
+                    <rect
+                      key={`heatmap_${ilot.id}`}
+                      x={ilot.x}
+                      y={ilot.y}
+                      width={ilot.width}
+                      height={ilot.height}
+                      fill={`rgba(239, 68, 68, ${intensity})`}
+                      className="pointer-events-none"
+                    />
+                  );
+                })}
+              </g>
+            )}
+          </svg>
+        </div>
+        
+        {/* Status bar */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center space-x-4">
+              <span>Scale: {(viewBox.scale * 100).toFixed(0)}%</span>
+              <span>Tool: {selectedTool}</span>
+              {selectedElements.length > 0 && (
+                <span>Selected: {selectedElements.length}</span>
+              )}
+            </div>
+            <div className="flex items-center space-x-4">
+              <span>Ilots: {ilots.length}</span>
+              <span>Total Area: {analytics.ilotArea.toFixed(1)}m²</span>
+              <span>Efficiency: {analytics.efficiency.toFixed(1)}%</span>
+            </div>
+          </div>
+        </div>
+        
+        {processing && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center mb-2">
+                <RefreshCw className="w-5 h-5 text-blue-500 animate-spin mr-2" />
+                <span className="font-medium">{processingStage}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderEditorView = () => (
+    <div className="flex h-full">
+      {renderSettingsPanel()}
+      {renderMainEditor()}
+      {renderLayerPanel()}
+    </div>
+  );
+
+  // Main render
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+      
+      {currentView === 'editor' && renderToolbar()}
+      
+      <div className="flex-1 overflow-hidden">
+        {currentView === 'upload' && renderUploadView()}
+        {currentView === 'processing' && renderProcessingView()}
+        {currentView === 'editor' && renderEditorView()}
+      </div>
+    </div>
+  );
+};
+
+export default AdvancedCADFloorPlanAnalyzer;
