@@ -1,13 +1,14 @@
 import { useState, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Zap, Save } from "lucide-react";
+import { Upload, Zap, Save, Eye } from "lucide-react";
 import FileUpload from "@/components/file-upload";
 import CADCanvas from "@/components/cad-canvas";
 import AnalysisTools from "@/components/analysis-tools";
 import IlotConfiguration from "@/components/ilot-configuration";
 import AnalyticsPanel from "@/components/analytics-panel";
 import LayerControls from "@/components/layer-controls";
+import Walkthrough3D from "@/components/walkthrough-3d";
 import { ProcessedFloorPlan, Ilot, Corridor, LayoutAnalytics } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +34,7 @@ interface AppState {
     labels: boolean;
   };
   analytics: LayoutAnalytics | null;
+  show3DWalkthrough: boolean;
 }
 
 export default function FloorPlanAnalyzer() {
@@ -60,7 +62,8 @@ export default function FloorPlanAnalyzer() {
       corridors: true,
       labels: false
     },
-    analytics: null
+    analytics: null,
+    show3DWalkthrough: false
   });
 
   const [processingStage, setProcessingStage] = useState("");
@@ -148,6 +151,23 @@ export default function FloorPlanAnalyzer() {
       description: "Your floor plan analysis has been saved.",
     });
   }, [appState.floorPlan, appState.ilots, toast]);
+
+  const handle3DWalkthrough = useCallback(() => {
+    if (!appState.floorPlan || appState.ilots.length === 0) {
+      toast({
+        title: "No Layout Available",
+        description: "Please generate an îlot layout first to view in 3D.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setAppState(prev => ({ ...prev, show3DWalkthrough: true }));
+  }, [appState.floorPlan, appState.ilots, toast]);
+
+  const handle3DWalkthroughClose = useCallback(() => {
+    setAppState(prev => ({ ...prev, show3DWalkthrough: false }));
+  }, []);
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -239,6 +259,15 @@ export default function FloorPlanAnalyzer() {
       {/* Floating Action Buttons */}
       <div className="fixed bottom-6 right-6 flex flex-col space-y-3">
         <Button
+          onClick={handle3DWalkthrough}
+          className="bg-purple-600 hover:bg-purple-700 p-3 rounded-full shadow-lg"
+          size="icon"
+          title="3D Walkthrough"
+          disabled={!appState.floorPlan || appState.ilots.length === 0}
+        >
+          <Eye className="w-6 h-6" />
+        </Button>
+        <Button
           onClick={handleQuickAnalysis}
           className="bg-blue-600 hover:bg-blue-700 p-3 rounded-full shadow-lg"
           size="icon"
@@ -255,6 +284,17 @@ export default function FloorPlanAnalyzer() {
           <Save className="w-6 h-6" />
         </Button>
       </div>
+
+      {/* 3D Walkthrough Modal */}
+      {appState.show3DWalkthrough && (
+        <Walkthrough3D
+          floorPlan={appState.floorPlan}
+          ilots={appState.ilots}
+          walls={appState.floorPlan?.processed?.walls || []}
+          corridors={appState.corridors}
+          onClose={handle3DWalkthroughClose}
+        />
+      )}
     </div>
   );
 }

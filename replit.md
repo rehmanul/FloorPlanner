@@ -39,11 +39,13 @@ Preferred communication style: Simple, everyday language.
 - **Phase 2**: Wall detection, restricted area identification, and space analysis
 - **Phase 3**: Intelligent îlot placement using configurable algorithms (intelligent, grid, genetic, simulated annealing)
 - **Phase 4**: Corridor network generation with pathfinding optimization
+- **Phase 5**: Advanced 3D walkthrough mode with realistic interior visualization
 
 ### Geometric Processing
 - **Algorithms**: Custom geometric utilities for collision detection, distance calculations, and line intersections
 - **Placement Engine**: Multi-algorithm support for different optimization strategies
 - **Visualization**: Real-time canvas rendering with layer-based display system
+- **3D Walkthrough**: Advanced Three.js-based realistic interior visualization with first-person controls, realistic lighting, furniture placement, and auto-walk functionality
 
 ## External Dependencies
 

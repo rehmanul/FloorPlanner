@@ -1,9 +1,5 @@
-import { forwardRef, useEffect, useRef, useImperativeHandle, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
-import { ProcessedFloorPlan, Ilot, Corridor } from "@shared/schema";
-import { CanvasRenderer } from "@/lib/canvas-renderer";
+import React, { forwardRef, useEffect, useRef, useImperativeHandle } from 'react';
+import { ProcessedFloorPlan, Ilot, Corridor } from '@shared/schema';
 
 interface CADCanvasProps {
   floorPlan: ProcessedFloorPlan | null;
@@ -34,259 +30,250 @@ const CADCanvas = forwardRef<HTMLCanvasElement, CADCanvasProps>(({
   processingProgress
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<CanvasRenderer | null>(null);
-  const [scale, setScale] = useState(1);
-  const [processTime, setProcessTime] = useState(0);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const animationFrameRef = useRef<number>();
 
-  useImperativeHandle(ref, () => canvasRef.current!, []);
+  useImperativeHandle(ref, () => canvasRef.current!);
 
-  // Initialize renderer
   useEffect(() => {
-    if (canvasRef.current) {
-      rendererRef.current = new CanvasRenderer(canvasRef.current);
-    }
-  }, []);
+    if (!canvasRef.current) return;
 
-  // Render floor plan and elements
-  useEffect(() => {
-    if (rendererRef.current && canvasRef.current) {
-      rendererRef.current.render({
-        floorPlan,
-        ilots: layers.ilots ? ilots : [],
-        corridors: layers.corridors ? corridors : [],
-        layers,
-        scale
-      });
-    }
-  }, [floorPlan, ilots, corridors, layers, scale]);
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-  // Update process time
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProcessTime(prev => prev + 0.1);
-    }, 100);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Resize canvas
-  useEffect(() => {
+    contextRef.current = context;
+    
+    // Set canvas size
     const resizeCanvas = () => {
-      if (canvasRef.current && containerRef.current) {
-        const container = containerRef.current;
-        canvasRef.current.width = container.clientWidth;
-        canvasRef.current.height = container.clientHeight;
-        
-        if (rendererRef.current) {
-          rendererRef.current.resize(container.clientWidth, container.clientHeight);
-        }
+      const container = canvas.parentElement;
+      if (container) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        draw();
       }
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    return () => window.removeEventListener('resize', resizeCanvas);
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, []);
 
-  const handleZoomIn = () => {
-    setScale(prev => Math.min(prev * 1.2, 5));
+  const draw = () => {
+    if (!contextRef.current || !canvasRef.current) return;
+
+    const ctx = contextRef.current;
+    const canvas = canvasRef.current;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (processing) {
+      drawProcessingScreen(ctx, canvas);
+      return;
+    }
+
+    if (!floorPlan) {
+      drawWelcomeScreen(ctx, canvas);
+      return;
+    }
+
+    // Set up coordinate system (CAD coordinates to canvas)
+    ctx.save();
+    
+    // Scale and translate to fit floor plan
+    const scale = Math.min(canvas.width / 1000, canvas.height / 800) * 0.8;
+    const offsetX = (canvas.width - 800 * scale) / 2;
+    const offsetY = (canvas.height - 600 * scale) / 2;
+    
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    // Draw grid
+    drawGrid(ctx);
+
+    // Draw floor plan elements based on layers
+    if (layers.walls && floorPlan.processed.walls) {
+      drawWalls(ctx, floorPlan.processed.walls);
+    }
+
+    if (layers.restricted && floorPlan.processed.restricted) {
+      drawRestrictedAreas(ctx, floorPlan.processed.restricted);
+    }
+
+    if (layers.entrances && floorPlan.processed.entrances) {
+      drawEntrances(ctx, floorPlan.processed.entrances);
+    }
+
+    if (layers.corridors) {
+      drawCorridors(ctx, corridors);
+    }
+
+    if (layers.ilots) {
+      drawIlots(ctx, ilots);
+    }
+
+    if (layers.labels) {
+      drawLabels(ctx, ilots);
+    }
+
+    ctx.restore();
   };
 
-  const handleZoomOut = () => {
-    setScale(prev => Math.max(prev / 1.2, 0.1));
+  const drawProcessingScreen = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw processing indicator
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    ctx.fillStyle = '#4a90e2';
+    ctx.font = '24px Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(processingStage, centerX, centerY - 40);
+
+    // Progress bar
+    const barWidth = 300;
+    const barHeight = 8;
+    const barX = centerX - barWidth / 2;
+    const barY = centerY + 20;
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    ctx.fillStyle = '#4a90e2';
+    ctx.fillRect(barX, barY, (barWidth * processingProgress) / 100, barHeight);
   };
 
-  const handleFitToView = () => {
-    setScale(1);
+  const drawWelcomeScreen = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    ctx.fillStyle = '#666';
+    ctx.font = '18px Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Upload a CAD file to begin analysis', centerX, centerY);
   };
+
+  const drawGrid = (ctx: CanvasRenderingContext2D) => {
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x <= 800; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 600);
+      ctx.stroke();
+    }
+
+    for (let y = 0; y <= 600; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(800, y);
+      ctx.stroke();
+    }
+  };
+
+  const drawWalls = (ctx: CanvasRenderingContext2D, walls: any[]) => {
+    walls.forEach(wall => {
+      ctx.strokeStyle = wall.isExterior ? '#333' : '#666';
+      ctx.lineWidth = wall.thickness || 10;
+      ctx.beginPath();
+      ctx.moveTo(wall.start.x, wall.start.y);
+      ctx.lineTo(wall.end.x, wall.end.y);
+      ctx.stroke();
+    });
+  };
+
+  const drawRestrictedAreas = (ctx: CanvasRenderingContext2D, restricted: any[]) => {
+    restricted.forEach(area => {
+      ctx.fillStyle = 'rgba(220, 38, 127, 0.3)';
+      ctx.fillRect(area.bounds.x, area.bounds.y, area.bounds.width, area.bounds.height);
+      
+      ctx.strokeStyle = '#dc267f';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(area.bounds.x, area.bounds.y, area.bounds.width, area.bounds.height);
+    });
+  };
+
+  const drawEntrances = (ctx: CanvasRenderingContext2D, entrances: any[]) => {
+    entrances.forEach(entrance => {
+      ctx.fillStyle = 'rgba(255, 109, 106, 0.7)';
+      ctx.fillRect(entrance.position.x - entrance.width/2, entrance.position.y - 5, entrance.width, 10);
+    });
+  };
+
+  const drawCorridors = (ctx: CanvasRenderingContext2D, corridors: Corridor[]) => {
+    corridors.forEach(corridor => {
+      ctx.fillStyle = 'rgba(255, 193, 7, 0.6)';
+      ctx.fillRect(corridor.x - corridor.width/2, corridor.y - corridor.length/2, corridor.width, corridor.length);
+    });
+  };
+
+  const drawIlots = (ctx: CanvasRenderingContext2D, ilots: Ilot[]) => {
+    ilots.forEach(ilot => {
+      ctx.fillStyle = 'rgba(72, 144, 226, 0.8)';
+      ctx.fillRect(ilot.x - ilot.width/2, ilot.y - ilot.height/2, ilot.width, ilot.height);
+      
+      ctx.strokeStyle = '#4a90e2';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(ilot.x - ilot.width/2, ilot.y - ilot.height/2, ilot.width, ilot.height);
+    });
+  };
+
+  const drawLabels = (ctx: CanvasRenderingContext2D, ilots: Ilot[]) => {
+    ilots.forEach((ilot, index) => {
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${index + 1}`, ilot.x, ilot.y + 4);
+    });
+  };
+
+  useEffect(() => {
+    draw();
+  }, [floorPlan, ilots, corridors, layers, processing, processingStage, processingProgress]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Canvas Toolbar */}
-      <div className="bg-gray-100 border-b border-gray-200 p-3 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              title="Zoom In"
-            >
-              <ZoomIn className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleFitToView}
-              title="Fit to View"
-            >
-              <Maximize className="w-5 h-5" />
-            </Button>
+    <div className="flex-1 relative bg-white">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full cursor-crosshair"
+        width={800}
+        height={600}
+      />
+      
+      {/* Canvas Controls */}
+      <div className="absolute top-4 left-4">
+        <div className="bg-white rounded-lg shadow-lg p-2 flex space-x-2">
+          <div className="text-xs text-gray-500">
+            Tool: <span className="font-medium capitalize">{selectedTool}</span>
           </div>
-          <div className="h-6 w-px bg-gray-300"></div>
-          <div className="text-sm font-mono text-gray-600">
-            Scale: <span>1:{Math.round(100 / scale)}</span> | Grid: <span>1.0m</span>
-          </div>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-sm font-mono text-gray-600">
-            Processing Time: <span>{processTime.toFixed(1)}s</span>
-          </div>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-            Real-time Mode
-          </Button>
         </div>
       </div>
-
-      {/* Canvas Container */}
-      <div ref={containerRef} className="flex-1 relative overflow-hidden bg-gray-50">
-        <canvas
-          ref={canvasRef}
-          className={`cad-canvas w-full h-full bg-white ${
-            selectedTool === 'select' ? 'cursor-default' :
-            selectedTool === 'measure' ? 'cursor-crosshair' :
-            'cursor-zoom-in'
-          }`}
-          width={1200}
-          height={800}
-        />
-
-        {/* Processing Overlay */}
-        {processing && (
-          <div className="processing-overlay absolute inset-0 flex items-center justify-center">
-            <Card className="max-w-md w-full mx-4">
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing CAD File</h3>
-                <p className="text-sm text-gray-600 mb-4">{processingStage}</p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${processingProgress}%` }}
-                  ></div>
-                </div>
-                <div className="text-xs text-gray-500">{processingProgress}% Complete</div>
-              </div>
-            </Card>
+      
+      {/* Canvas Info */}
+      <div className="absolute bottom-4 left-4">
+        <div className="bg-white rounded-lg shadow-lg p-2">
+          <div className="text-xs text-gray-500">
+            {floorPlan ? `${floorPlan.name} • ${ilots.length} îlots` : 'No file loaded'}
           </div>
-        )}
-
-        {/* Sample Floor Plan (when no real data) */}
-        {!floorPlan && !processing && (
-          <div className="absolute inset-4 bg-gray-50 border-2 border-gray-300 rounded-lg overflow-hidden">
-            <svg viewBox="0 0 800 600" className="w-full h-full">
-              <rect width="800" height="600" fill="#F8F9FA"/>
-              
-              {/* Grid Pattern */}
-              <defs>
-                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#E5E7EB" strokeWidth="0.5"/>
-                </pattern>
-              </defs>
-              <rect width="800" height="600" fill="url(#grid)"/>
-              
-              {/* Sample walls and elements matching reference images */}
-              <g stroke="var(--cad-wall)" strokeWidth="8" fill="none">
-                <rect x="50" y="50" width="700" height="500"/>
-              </g>
-              
-              <g stroke="var(--cad-wall)" strokeWidth="6" fill="none">
-                <line x1="200" y1="50" x2="200" y2="250"/>
-                <line x1="200" y1="300" x2="200" y2="550"/>
-                <line x1="350" y1="50" x2="350" y2="180"/>
-                <line x1="350" y1="220" x2="350" y2="380"/>
-                <line x1="350" y1="420" x2="350" y2="550"/>
-                <line x1="500" y1="50" x2="500" y2="300"/>
-                <line x1="500" y1="350" x2="500" y2="550"/>
-                <line x1="650" y1="100" x2="650" y2="250"/>
-                <line x1="650" y1="300" x2="650" y2="450"/>
-                
-                <line x1="50" y1="200" x2="200" y2="200"/>
-                <line x1="50" y1="350" x2="200" y2="350"/>
-                <line x1="200" y1="380" x2="350" y2="380"/>
-                <line x1="350" y1="300" x2="500" y2="300"/>
-                <line x1="500" y1="200" x2="650" y2="200"/>
-                <line x1="200" y1="450" x2="350" y2="450"/>
-                <line x1="500" y1="450" x2="650" y2="450"/>
-              </g>
-              
-              {layers.restricted && (
-                <g fill="var(--cad-restricted)" opacity="0.7">
-                  <rect x="150" y="150" width="40" height="40"/>
-                  <rect x="150" y="400" width="40" height="40"/>
-                </g>
-              )}
-              
-              {layers.entrances && (
-                <>
-                  <g fill="var(--cad-entrance)" opacity="0.7">
-                    <rect x="45" y="500" width="10" height="40"/>
-                    <rect x="345" y="45" width="10" height="10"/>
-                  </g>
-                  <g stroke="var(--cad-entrance)" strokeWidth="2" fill="none" opacity="0.7">
-                    <path d="M 50 500 A 30 30 0 0 0 80 530"/>
-                    <path d="M 350 50 A 25 25 0 0 1 375 75"/>
-                  </g>
-                </>
-              )}
-              
-              {layers.ilots && ilots.length > 0 && (
-                <g fill="var(--cad-ilot)" stroke="#65A30D" strokeWidth="2" opacity="0.8">
-                  {ilots.map(ilot => (
-                    <rect
-                      key={ilot.id}
-                      x={ilot.x}
-                      y={ilot.y}
-                      width={ilot.width}
-                      height={ilot.height}
-                    />
-                  ))}
-                </g>
-              )}
-              
-              {layers.corridors && corridors.length > 0 && (
-                <g stroke="var(--cad-corridor)" strokeWidth="3" fill="none" opacity="0.8">
-                  {corridors.map(corridor => (
-                    <line
-                      key={corridor.id}
-                      x1={corridor.x1}
-                      y1={corridor.y1}
-                      x2={corridor.x2}
-                      y2={corridor.y2}
-                    />
-                  ))}
-                </g>
-              )}
-              
-              {layers.labels && ilots.length > 0 && (
-                <g fontFamily="Roboto Mono" fontSize="10" fill="#374151">
-                  {ilots.map(ilot => (
-                    <text
-                      key={`${ilot.id}-label`}
-                      x={ilot.x + ilot.width / 2}
-                      y={ilot.y + ilot.height / 2}
-                      textAnchor="middle"
-                    >
-                      {ilot.area.toFixed(1)}m²
-                    </text>
-                  ))}
-                </g>
-              )}
-            </svg>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
 });
 
-CADCanvas.displayName = "CADCanvas";
+CADCanvas.displayName = 'CADCanvas';
+
 export default CADCanvas;

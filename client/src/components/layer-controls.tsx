@@ -1,4 +1,8 @@
-import { Checkbox } from "@/components/ui/checkbox";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Layers, Eye, EyeOff } from 'lucide-react';
 
 interface LayerControlsProps {
   layers: {
@@ -14,30 +18,60 @@ interface LayerControlsProps {
 
 export default function LayerControls({ layers, onLayerToggle }: LayerControlsProps) {
   const layerConfig = [
-    { key: 'walls' as const, label: 'Walls (MUR)', color: 'bg-cad-wall' },
-    { key: 'restricted' as const, label: 'Restricted Areas', color: 'bg-cad-restricted' },
-    { key: 'entrances' as const, label: 'Entrances/Exits', color: 'bg-cad-entrance' },
-    { key: 'ilots' as const, label: 'Îlots', color: 'bg-cad-ilot' },
-    { key: 'corridors' as const, label: 'Corridors', color: 'bg-cad-corridor' },
-    { key: 'labels' as const, label: 'Area Labels', color: 'bg-gray-500' },
+    { key: 'walls' as const, label: 'Walls', color: '#666', description: 'Structural walls' },
+    { key: 'restricted' as const, label: 'Restricted', color: '#dc267f', description: 'Restricted areas' },
+    { key: 'entrances' as const, label: 'Entrances', color: '#ff6d6a', description: 'Entry points' },
+    { key: 'ilots' as const, label: 'Îlots', color: '#4a90e2', description: 'Workspace pods' },
+    { key: 'corridors' as const, label: 'Corridors', color: '#ffc107', description: 'Walkways' },
+    { key: 'labels' as const, label: 'Labels', color: '#333', description: 'Text labels' }
   ];
 
+  const visibleLayers = Object.values(layers).filter(Boolean).length;
+
   return (
-    <div className="p-6 flex-1">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Layer Visibility</h3>
-      <div className="space-y-3">
-        {layerConfig.map(({ key, label, color }) => (
-          <div key={key} className="flex items-center space-x-3">
-            <Checkbox
-              checked={layers[key]}
-              onCheckedChange={(checked) => onLayerToggle(key, !!checked)}
-              className="h-4 w-4"
-            />
-            <div className={`w-4 h-4 rounded ${color}`} />
-            <span className="text-sm">{label}</span>
+    <Card className="border-0 shadow-none">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+          <div className="flex items-center">
+            <Layers className="w-4 h-4 mr-2" />
+            Layer Controls
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            {visibleLayers}/6
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {layerConfig.map((layer) => (
+          <div key={layer.key} className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div
+                className="w-3 h-3 rounded-sm"
+                style={{ backgroundColor: layer.color }}
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-700">
+                  {layer.label}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {layer.description}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {layers[layer.key] ? (
+                <Eye className="w-4 h-4 text-gray-400" />
+              ) : (
+                <EyeOff className="w-4 h-4 text-gray-300" />
+              )}
+              <Switch
+                checked={layers[layer.key]}
+                onCheckedChange={(checked) => onLayerToggle(layer.key, checked)}
+              />
+            </div>
           </div>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
