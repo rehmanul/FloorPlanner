@@ -30,7 +30,7 @@ export default function AnalyticsPanel({
           <Card className="analysis-card text-white">
             <CardContent className="p-4">
               <div className="text-2xl font-bold font-mono">
-                {floorPlan?.spaceAnalysis.totalArea.toFixed(1) || '0.0'}
+                {floorPlan?.spaceAnalysis?.totalArea?.toFixed(1) || '0.0'}
               </div>
               <div className="text-sm opacity-90">Total Area (m²)</div>
             </CardContent>
@@ -38,10 +38,10 @@ export default function AnalyticsPanel({
           <Card className="analysis-card text-white">
             <CardContent className="p-4">
               <div className="text-2xl font-bold font-mono">
-                {floorPlan?.spaceAnalysis.usableArea.toFixed(1) || '0.0'}
+                {floorPlan?.spaceAnalysis?.usableArea?.toFixed(1) || '0.0'}
               </div>
               <div className="text-sm opacity-90">Usable Area (m²)</div>
-            </CardContent>
+            </CardContent></old_str>
           </Card>
           <Card className="analysis-card text-white">
             <CardContent className="p-4">
