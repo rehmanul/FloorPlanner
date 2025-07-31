@@ -41,7 +41,8 @@ export default function AnalyticsPanel({
                 {floorPlan?.spaceAnalysis?.usableArea?.toFixed(1) || '0.0'}
               </div>
               <div className="text-sm opacity-90">Usable Area (m²)</div>
-            </CardContent></old_str>
+            </CardContent>
+          </Card></old_str>
           </Card>
           <Card className="analysis-card text-white">
             <CardContent className="p-4">
