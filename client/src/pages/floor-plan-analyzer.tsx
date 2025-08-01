@@ -7,7 +7,6 @@ import FileUpload from "@/components/file-upload";
 import IlotConfiguration from "@/components/ilot-configuration";
 import LayerControls from "@/components/layer-controls";
 import AnalysisTools from "@/components/analysis-tools";
-import AnalyticsPanel from '@/components/analytics-panel';
 import PixelPerfectCADRenderer from "@/components/pixel-perfect-cad-renderer";
 import RealAnalyticsPanel from "@/components/real-analytics-panel";
 import Advanced3DWalkthrough from "@/components/advanced-3d-walkthrough";
