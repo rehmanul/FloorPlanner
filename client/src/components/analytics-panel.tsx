@@ -239,7 +239,7 @@ function calculateRealTimeAnalytics(
   ilots: Ilot[], 
   corridors: Corridor[]
 ) {
-  if (!floorPlan || ilots.length === 0) {
+  if (!floorPlan || !ilots || ilots.length === 0) {
     return {
       ilotCount: 0,
       totalIlotArea: 0,
