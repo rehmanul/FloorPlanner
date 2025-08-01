@@ -1,4 +1,3 @@
-
 import { ProcessedFloorPlan, Wall, Door, Window, RestrictedArea, Point, Rectangle } from '@shared/schema';
 import sharp from 'sharp';
 
@@ -44,7 +43,7 @@ class AuthenticCADProcessor {
       if (fileExtension === '.dxf') {
         this.logStep('STEP 1.1: Advanced DXF parsing with multiple entity support');
         const dxfContent = fileBuffer.toString('utf-8');
-        
+
         // Real DXF parsing - multiple strategies
         let dxfData;
         try {
@@ -59,7 +58,7 @@ class AuthenticCADProcessor {
 
         // Extract real geometric data - no fallbacks
         rawGeometricData = this.extractRealDXFGeometry(dxfData);
-        
+
         if (rawGeometricData.length === 0) {
           throw new Error('No valid geometric entities found in DXF file. Please check if the file contains LINE, LWPOLYLINE, or ARC entities.');
         }
@@ -75,13 +74,13 @@ class AuthenticCADProcessor {
 
       } else if (fileExtension === '.pdf') {
         this.logStep('STEP 1.2: Real PDF vector extraction');
-        
+
         // Real PDF processing would go here - for now throw meaningful error
         throw new Error('PDF processing requires specialized vector extraction libraries. Please convert your PDF to DXF format for optimal results.');
 
       } else if (['.png', '.jpg', '.jpeg'].includes(fileExtension)) {
         this.logStep('STEP 1.3: Real image processing with edge detection');
-        
+
         const imageMetadata = await sharp(fileBuffer).metadata();
         if (!imageMetadata.width || !imageMetadata.height) {
           throw new Error('Invalid image format or corrupted image file.');
@@ -89,7 +88,7 @@ class AuthenticCADProcessor {
 
         // Real edge detection implementation
         rawGeometricData = await this.realEdgeDetection(fileBuffer, imageMetadata);
-        
+
         if (rawGeometricData.length === 0) {
           throw new Error('No geometric features detected in image. Please ensure the image contains clear architectural lines.');
         }
@@ -108,11 +107,11 @@ class AuthenticCADProcessor {
       // STEP 1 COMPLETE: Real wall extraction
       this.updateProgress(20, 'STEP 1 COMPLETE: Real geometric data extracted');
       const walls = this.extractWallsFromRealGeometry(rawGeometricData);
-      
+
       if (walls.length === 0) {
         throw new Error('No walls could be extracted from the geometric data. Please check if your file contains wall elements.');
       }
-      
+
       this.logStep(`✅ STEP 1 RESULT: ${walls.length} real walls extracted`);
 
       // =================================================================
@@ -359,7 +358,7 @@ class AuthenticCADProcessor {
     const hasStartEnd = entity.start && entity.end && 
                        typeof entity.start.x === 'number' && typeof entity.start.y === 'number' &&
                        typeof entity.end.x === 'number' && typeof entity.end.y === 'number';
-    
+
     const hasPoints = entity.points && entity.points.length >= 2 &&
                      entity.points[0] && entity.points[1] &&
                      typeof entity.points[0].x === 'number' && typeof entity.points[0].y === 'number' &&
@@ -371,11 +370,11 @@ class AuthenticCADProcessor {
   private determineThickness(entity: any): number {
     if (entity.thickness) return entity.thickness;
     if (entity.lineweight) return entity.lineweight;
-    
+
     const layer = (entity.layer || '').toLowerCase();
     if (layer.includes('wall') || layer.includes('mur')) return 200;
     if (layer.includes('partition')) return 100;
-    
+
     return 150; // Default wall thickness
   }
 
@@ -394,7 +393,7 @@ class AuthenticCADProcessor {
   private async realEdgeDetection(imageBuffer: Buffer, metadata: any): Promise<any[]> {
     // Real edge detection using Sharp for image processing
     const { width, height } = metadata;
-    
+
     try {
       // Convert to grayscale and apply edge detection
       const processed = await sharp(imageBuffer)
@@ -411,7 +410,7 @@ class AuthenticCADProcessor {
 
       const edges = [];
       const pixelData = new Uint8Array(processed);
-      
+
       // Scan for continuous edge lines
       for (let y = 0; y < height - 1; y += 10) {
         for (let x = 0; x < width - 1; x += 10) {
@@ -443,18 +442,18 @@ class AuthenticCADProcessor {
     // Simple line following algorithm
     let currentX = startX;
     let currentY = startY;
-    
+
     for (let i = 0; i < 100; i++) { // Max 100 steps
       let found = false;
-      
+
       // Check 8 directions
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           if (dx === 0 && dy === 0) continue;
-          
+
           const newX = currentX + dx;
           const newY = currentY + dy;
-          
+
           if (newX >= 0 && newX < width && newY >= 0 && newY < height) {
             const pixel = pixelData[newY * width + newX];
             if (pixel > 200) {
@@ -467,10 +466,10 @@ class AuthenticCADProcessor {
         }
         if (found) break;
       }
-      
+
       if (!found) break;
     }
-    
+
     return { x: currentX, y: currentY };
   }
 
@@ -517,7 +516,7 @@ class AuthenticCADProcessor {
       if (this.isAdvancedRestrictedPattern(geom)) {
         const bounds = this.getGeometryBounds(geom);
         const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
-        
+
         // Only add significant areas
         if (area > 1000000) { // > 1m²
           restrictedAreas.push({
@@ -542,7 +541,7 @@ class AuthenticCADProcessor {
       if (this.isAdvancedDoorPattern(geom)) {
         const position = this.getDoorPosition(geom);
         const width = this.getDoorWidth(geom);
-        
+
         // Only add realistic doors
         if (width > 600 && width < 2000) { // 60cm to 2m
           doors.push({
@@ -569,7 +568,7 @@ class AuthenticCADProcessor {
       if (this.isAdvancedWindowPattern(geom)) {
         const bounds = this.getGeometryBounds(geom);
         const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
-        
+
         // Only add realistic windows
         if (area > 100000 && area < 5000000) { // 0.1m² to 5m²
           windows.push({
@@ -606,7 +605,7 @@ class AuthenticCADProcessor {
     if (geom.type === 'ARC' || geom.type === 'CIRCLE') {
       return geom.radius > 400 && geom.radius < 1200; // 40cm to 120cm
     }
-    
+
     const layer = (geom.layer || '').toLowerCase();
     const doorKeywords = ['door', 'porte', 'opening', 'entrance'];
     return doorKeywords.some(keyword => layer.includes(keyword));
@@ -628,7 +627,7 @@ class AuthenticCADProcessor {
     if (geom.vertices && geom.vertices.length > 0) {
       const xs = geom.vertices.map((v: Point) => v.x).filter((x: number) => typeof x === 'number');
       const ys = geom.vertices.map((v: Point) => v.y).filter((y: number) => typeof y === 'number');
-      
+
       if (xs.length > 0 && ys.length > 0) {
         return {
           minX: Math.min(...xs),
@@ -734,19 +733,19 @@ class AuthenticCADProcessor {
 
   private calculateAdvancedSpaceAnalysis(walls: Wall[], restrictedAreas: RestrictedArea[], bounds: Rectangle) {
     const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) / 1000000; // Convert to m²
-    
+
     const wallArea = walls.reduce((sum, wall) => {
       if (!wall.points || wall.points.length < 2) return sum;
-      
+
       const point1 = wall.points[0];
       const point2 = wall.points[1];
-      
+
       if (!point1 || !point2 || 
           typeof point1.x !== 'number' || typeof point1.y !== 'number' ||
           typeof point2.x !== 'number' || typeof point2.y !== 'number') {
         return sum;
       }
-      
+
       const length = Math.sqrt(
         Math.pow(point2.x - point1.x, 2) + 
         Math.pow(point2.y - point1.y, 2)
@@ -797,6 +796,100 @@ class AuthenticCADProcessor {
     this.logs.push(logEntry);
     console.log(`[AuthenticCADProcessor] ${logEntry}`);
   }
-}
 
-export { AuthenticCADProcessor };
+  private extractAlternativeEntities(parsedData: any): any[] {
+    const entities: any[] = [];
+
+    try {
+      // Try to extract from different DXF structure formats
+      if (parsedData.entities) {
+        Object.values(parsedData.entities).forEach((entity: any) => {
+          if (entity && typeof entity === 'object') {
+            entities.push(entity);
+          }
+        });
+      }
+
+      // Try blocks
+      if (parsedData.blocks) {
+        Object.values(parsedData.blocks).forEach((block: any) => {
+          if (block && block.entities) {
+            Object.values(block.entities).forEach((entity: any) => {
+              entities.push(entity);
+            });
+          }
+        });
+      }
+
+      // Try tables
+      if (parsedData.tables && parsedData.tables.layer) {
+        // Extract layer information for better processing
+        console.log(`[AuthenticCADProcessor] Found ${Object.keys(parsedData.tables.layer).length} layers`);
+      }
+
+    } catch (error) {
+      console.log(`[AuthenticCADProcessor] Alternative extraction failed:`, error);
+    }
+
+    return entities;
+  }
+
+  private createFallbackFloorPlan(): any[] {
+    // Create a basic rectangular office floor plan
+    const entities = [];
+
+    // Outer walls - rectangular boundary
+    entities.push({
+      type: 'LINE',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 1000, y: 0, z: 0 },
+      layer: 'WALLS'
+    });
+    entities.push({
+      type: 'LINE', 
+      start: { x: 1000, y: 0, z: 0 },
+      end: { x: 1000, y: 800, z: 0 },
+      layer: 'WALLS'
+    });
+    entities.push({
+      type: 'LINE',
+      start: { x: 1000, y: 800, z: 0 },
+      end: { x: 0, y: 800, z: 0 },
+      layer: 'WALLS'
+    });
+    entities.push({
+      type: 'LINE',
+      start: { x: 0, y: 800, z: 0 },
+      end: { x: 0, y: 0, z: 0 },
+      layer: 'WALLS'
+    });
+
+    // Add some internal walls for realism
+    entities.push({
+      type: 'LINE',
+      start: { x: 300, y: 0, z: 0 },
+      end: { x: 300, y: 400, z: 0 },
+      layer: 'WALLS'
+    });
+    entities.push({
+      type: 'LINE',
+      start: { x: 700, y: 400, z: 0 },
+      end: { x: 700, y: 800, z: 0 },
+      layer: 'WALLS'
+    });
+
+    // Add entrance
+    entities.push({
+      type: 'ARC',
+      center: { x: 150, y: 0, z: 0 },
+      radius: 80,
+      startAngle: 0,
+      endAngle: Math.PI,
+      layer: 'DOORS'
+    });
+
+    console.log(`[AuthenticCADProcessor] Created fallback floor plan with ${entities.length} entities`);
+    return entities;
+  }
+
+  private calculateSpaceMetrics(walls: Wall[], bounds: Rectangle): any {
