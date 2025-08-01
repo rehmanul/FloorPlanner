@@ -1,0 +1,69 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+Re-optimizing dependencies because lockfile has changed
+2:26:35 AM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2:31:45 AM [vite] hmr update /src/pages/floor-plan-analyzer.tsx, /src/index.css?v=8Aw5KaLmeZLLCjTwlJANt
+2:31:46 AM [vite] Internal server error: /home/runner/workspace/client/src/pages/floor-plan-analyzer.tsx: Identifier 'AnalysisTools' has already been declared. (13:7)
+
+  11 | import AnalyticsPanel from '@/components/analytics-panel';
+  12 | import PixelPerfectCADRenderer from "@/components/pixel-perfect-cad-renderer";
+> 13 | import AnalysisTools from "@/components/analysis-tools";
+     |        ^
+  14 | import IlotConfiguration from "@/components/ilot-configuration";
+  15 | import RealAnalyticsPanel from "@/components/real-analytics-panel";
+  16 | import LayerControls from "@/components/layer-controls";
+  Plugin: vite:react-babel
+  File: /home/runner/workspace/client/src/pages/floor-plan-analyzer.tsx:13:7
+  11 |  import AnalyticsPanel from '@/components/analytics-panel';
+  12 |  import PixelPerfectCADRenderer from "@/components/pixel-perfect-cad-renderer";
+  13 |  import AnalysisTools from "@/components/analysis-tools";
+     |         ^
+  14 |  import IlotConfiguration from "@/components/ilot-configuration";
+  15 |  import RealAnalyticsPanel from "@/components/real-analytics-panel";
+      at toParseError (/home/runner/workspace/node_modules/@babel/parser/src/parse-error.ts:95:45)
+      at raise (/home/runner/workspace/node_modules/@babel/parser/src/tokenizer/index.ts:1497:19)
+      at checkRedeclarationInScope (/home/runner/workspace/node_modules/@babel/parser/src/util/scope.ts:155:19)
+      at declareName (/home/runner/workspace/node_modules/@babel/parser/src/util/scope.ts:109:12)
+      at declareName (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/scope.ts:89:11)
+      at declareNameFromIdentifier (/home/runner/workspace/node_modules/@babel/parser/src/parser/lval.ts:739:16)
+      at checkIdentifier (/home/runner/workspace/node_modules/@babel/parser/src/parser/lval.ts:734:12)
+      at checkLVal (/home/runner/workspace/node_modules/@babel/parser/src/parser/lval.ts:636:12)
+      at finishImportSpecifier (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:3185:10)
+      at parseImportSpecifierLocal (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:3172:31)
+      at maybeParseDefaultImportSpecifier (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:3356:12)
+      at parseImportSpecifiersAndAfter (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:3120:29)
+      at parseImport (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:3105:17)
+      at parseImport (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2895:28)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:601:25)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3056:20)
+      at parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:437:17)
+      at parseModuleItem (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:374:17)
+      at parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1419:16)
+      at parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1393:10)
+      at parseProgram (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:225:10)
+      at parseTopLevel (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:203:25)
+      at parse (/home/runner/workspace/node_modules/@babel/parser/src/parser/index.ts:90:10)
+      at parse (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:4192:20)
+      at parse (/home/runner/workspace/node_modules/@babel/parser/src/index.ts:92:38)
+      at parser (/home/runner/workspace/node_modules/@babel/core/src/parser/index.ts:28:19)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/runner/workspace/node_modules/@babel/core/src/transformation/normalize-file.ts:50:24)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/runner/workspace/node_modules/@babel/core/src/transformation/index.ts:40:36)
+      at run.next (<anonymous>)
+      at transform (/home/runner/workspace/node_modules/@babel/core/src/transform.ts:29:20)
+      at transform.next (<anonymous>)
+      at step (/home/runner/workspace/node_modules/gensync/index.js:261:32)
+      at /home/runner/workspace/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/runner/workspace/node_modules/gensync/index.js:223:11)
+      at /home/runner/workspace/node_modules/gensync/index.js:189:28
+      at <anonymous> (/home/runner/workspace/node_modules/@babel/core/src/gensync-utils/async.ts:90:7)
+      at /home/runner/workspace/node_modules/gensync/index.js:113:33
+      at step (/home/runner/workspace/node_modules/gensync/index.js:287:14)
+      at /home/runner/workspace/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/runner/workspace/node_modules/gensync/index.js:223:11)
