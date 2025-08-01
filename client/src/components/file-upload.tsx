@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { ProcessedFloorPlan } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
+import { DXFProcessor } from "../lib/dxf-processor";
 
 interface FileUploadProps {
   onFileProcessed: (floorPlan: ProcessedFloorPlan) => void;

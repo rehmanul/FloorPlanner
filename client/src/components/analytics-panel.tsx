@@ -174,3 +174,75 @@ export default function AnalyticsPanel({
     </div>
   );
 }
+
+// Analytics calculation functions
+function calculateFireCompliance(floorPlan: ProcessedFloorPlan | null, ilots: any[], corridors: any[]): number {
+  if (!floorPlan || ilots.length === 0) return 0;
+
+  const minCorridorWidth = 120; // cm
+  const maxDistanceToExit = 30000; // 30m in cm
+
+  let complianceScore = 0;
+  let totalChecks = 0;
+
+  // Check corridor widths
+  corridors.forEach(corridor => {
+    totalChecks++;
+    if (corridor.width >= minCorridorWidth) {
+      complianceScore++;
+    }
+  });
+
+  // Check îlot spacing (simplified)
+  ilots.forEach(ilot => {
+    totalChecks++;
+    const hasAdequateAccess = corridors.some(corridor => {
+      const distance = Math.min(
+        Math.abs(corridor.x1 - ilot.x),
+        Math.abs(corridor.x2 - ilot.x),
+        Math.abs(corridor.y1 - ilot.y),
+        Math.abs(corridor.y2 - ilot.y)
+      );
+      return distance < 500; // 5m access requirement
+    });
+
+    if (hasAdequateAccess) {
+      complianceScore++;
+    }
+  });
+
+  // Check door accessibility
+  if (floorPlan.doors && floorPlan.doors.length > 0) {
+    totalChecks++;
+    const hasEmergencyAccess = floorPlan.doors.some(door => 
+      corridors.some(corridor => {
+        const distanceToDoor = Math.sqrt(
+          Math.pow(corridor.x1 - door.center.x, 2) + 
+          Math.pow(corridor.y1 - door.center.y, 2)
+        );
+        return distanceToDoor < maxDistanceToExit;
+      })
+    );
+
+    if (hasEmergencyAccess) {
+      complianceScore++;
+    }
+  }
+
+  return totalChecks > 0 ? (complianceScore / totalChecks) * 100 : 0;
+}
+
+function calculateIlotDensity(ilots: any[], totalArea: number): number {
+  const totalIlotArea = ilots.reduce((sum, ilot) => sum + ilot.area, 0);
+  return totalArea > 0 ? (totalIlotArea / totalArea) * 100 : 0;
+}
+
+function calculateAverageIlotSize(ilots: any[]): number {
+  if (ilots.length === 0) return 0;
+  const totalArea = ilots.reduce((sum, ilot) => sum + ilot.area, 0);
+  return totalArea / ilots.length;
+}
+
+AnalyticsPanel.displayName = 'AnalyticsPanel';
+
+export default AnalyticsPanel;

@@ -35,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileContent = req.file.buffer.toString('utf-8');
       const fileType = '.' + req.file.originalname.split('.').pop()?.toLowerCase();
 
+      // Create initial floor plan record
       const floorPlanData = insertFloorPlanSchema.parse({
         name: req.body.name || req.file.originalname,
         originalFileName: req.file.originalname,
@@ -43,7 +44,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const floorPlan = await storage.createFloorPlan(floorPlanData);
-      res.json(floorPlan);
+
+      // Process the file based on type
+      let processedData;
+      if (fileType === '.dxf' || fileType === '.dwg') {
+        const { DXFProcessor } = await import('../lib/dxf-processor');
+        const processor = new DXFProcessor();
+        processedData = await processor.processDXF(fileContent);
+      } else if (fileType === '.pdf') {
+        // TODO: Implement PDF processing
+        throw new Error('PDF processing not yet implemented');
+      } else {
+        throw new Error(`Unsupported file type: ${fileType}`);
+      }
+
+      // Update floor plan with processed data
+      const updatedFloorPlan = await storage.updateFloorPlanStatus(
+        floorPlan.id,
+        'completed',
+        processedData,
+        processedData.spaceAnalysis
+      );
+
+      res.json(updatedFloorPlan);
     } catch (error) {
       console.error('Floor plan upload error:', error);
       res.status(500).json({ 
