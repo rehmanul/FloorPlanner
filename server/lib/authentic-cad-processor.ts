@@ -211,7 +211,10 @@ export class AuthenticCADProcessor {
       const line = lines[i].trim();
 
       if (line === '0') {
-        if (currentEntity && currentEntity.type === 'LINE') {
+        if (currentEntity && currentEntity.type === 'LINE' && currentEntity.start && currentEntity.end) {
+          // Mark as wall and add to entities
+          currentEntity.isWall = true;
+          currentEntity.thickness = currentEntity.thickness || 150;
           entities.push(currentEntity);
           entityCount++;
         }
@@ -242,6 +245,18 @@ export class AuthenticCADProcessor {
         if (!currentEntity.end) currentEntity.end = {};
         currentEntity.end.y = parseFloat(lines[i + 1]);
       }
+      
+      // Extract layer information
+      if (line === '8' && i + 1 < lines.length) {
+        currentEntity.layer = lines[i + 1].trim();
+      }
+    }
+
+    // Add the last entity if it's a valid line
+    if (currentEntity && currentEntity.type === 'LINE' && currentEntity.start && currentEntity.end) {
+      currentEntity.isWall = true;
+      currentEntity.thickness = currentEntity.thickness || 150;
+      entities.push(currentEntity);
     }
 
     return { entities: entities };

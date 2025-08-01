@@ -198,12 +198,12 @@ export default function ResponsiveFloorPlanAnalyzer() {
         <div className={`
           bg-white border-r border-gray-200 shadow-lg transition-all duration-300 ease-in-out flex-shrink-0
           ${appState.leftDrawerOpen 
-            ? 'fixed lg:relative w-full sm:w-80 lg:w-80 xl:w-96 z-50 lg:z-auto' 
+            ? 'fixed lg:relative w-80 sm:w-96 z-50 lg:z-auto' 
             : 'w-0 overflow-hidden'
           }
           h-full
         `}>
-          <div className="w-full sm:w-80 lg:w-80 xl:w-96 h-full flex flex-col bg-white">
+          <div className="w-80 sm:w-96 h-full flex flex-col bg-white">
             {/* Drawer Header */}
             <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-sm font-semibold text-gray-700">Tools & Configuration</h3>
