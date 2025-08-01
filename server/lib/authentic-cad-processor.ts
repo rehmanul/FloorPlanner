@@ -1,4 +1,3 @@
-import * as dxfParser from 'dxf-parser';
 import sharp from 'sharp';
 import { ProcessedFloorPlan, Wall, Door, Window, RestrictedArea, Point, Rectangle } from '@shared/schema';
 
@@ -48,7 +47,10 @@ export class AuthenticCADProcessor {
         
         let dxfData;
         try {
-          dxfData = dxfParser.parse(dxfContent);
+          // Use dynamic import for dxf-parser
+          const dxfParser = await import('dxf-parser');
+          const parser = new dxfParser.default();
+          dxfData = parser.parseSync(dxfContent);
           this.logStep("DXF parsing completed, extracting geometric entities");
         } catch (parseError) {
           // Fallback to manual parsing if library parsing fails
