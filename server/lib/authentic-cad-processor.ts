@@ -198,19 +198,22 @@ export class AuthenticCADProcessor {
   }
 
   private parseBasicDXF(content: string): any {
-    // Basic DXF parsing for LINE entities (walls)
+    // Basic DXF parsing for LINE entities (walls) with stack overflow prevention
     const lines = content.split('\n');
     const entities = [];
+    const maxEntities = 10000; // Limit to prevent stack overflow
 
     let currentEntity: any = null;
     let currentGroup = '';
+    let entityCount = 0;
 
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length && entityCount < maxEntities; i++) {
       const line = lines[i].trim();
 
       if (line === '0') {
         if (currentEntity && currentEntity.type === 'LINE') {
           entities.push(currentEntity);
+          entityCount++;
         }
         currentEntity = { type: '', points: [] };
         currentGroup = '0';

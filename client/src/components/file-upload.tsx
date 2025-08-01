@@ -134,8 +134,9 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
       </CardHeader>
       <CardContent className="relative z-0">
         {!processing ? (
-          <div
-            className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          <label 
+            htmlFor="file-upload-input"
+            className={`relative block border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
               dragActive 
                 ? 'border-blue-400 bg-blue-50' 
                 : 'border-gray-300 hover:border-gray-400'
@@ -162,12 +163,13 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
               </div>
             </div>
             <input
+              id="file-upload-input"
               type="file"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               accept=".dxf,.dwg,.pdf,.jpg,.jpeg,.png,.tiff,.tif"
               onChange={handleFileInput}
             />
-          </div>
+          </label>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
