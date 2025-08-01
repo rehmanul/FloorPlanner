@@ -48,13 +48,13 @@ export class AuthenticCADProcessor {
         let dxfData;
         try {
           // Use dynamic import for dxf-parser
-          const dxfParser = await import('dxf-parser');
-          const parser = new dxfParser.default();
+          const DxfParser = (await import('dxf-parser')).default;
+          const parser = new DxfParser();
           dxfData = parser.parseSync(dxfContent);
           this.logStep("DXF parsing completed, extracting geometric entities");
         } catch (parseError) {
           // Fallback to manual parsing if library parsing fails
-          this.logStep("Standard parsing failed, using fallback method");
+          this.logStep(`Standard parsing failed (${parseError}), using fallback method`);
           dxfData = this.parseBasicDXF(dxfContent);
         }
 
