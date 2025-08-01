@@ -29,25 +29,34 @@ export class AuthenticCADProcessor {
   ): Promise<ProcessedFloorPlan> {
     this.currentStep = 0;
     this.logs = [];
-    
+
     this.logStep(`Starting authentic CAD processing for ${fileName}`);
-    
+
     try {
       // =================================================================
       // STEP 1: LOADING THE PLAN - WALLS AS BLACK LINES
       // =================================================================
       this.updateProgress(5, 'STEP 1: Loading Plan - Extracting walls as black lines...');
-      
+
       let rawGeometricData: any[] = [];
       let fileMetadata: any = {};
-      
+
       // Authentic file parsing based on actual file type
       if (fileExtension === '.dxf') {
         this.logStep('STEP 1.1: Parsing DXF file with real geometric extraction');
         const dxfContent = fileBuffer.toString('utf-8');
-        const parsedDXF = (dxfParser as any).parseSync(dxfContent);
         
-        rawGeometricData = parsedDXF.entities?.map((entity: any) => ({
+        let dxfData;
+        try {
+          dxfData = dxfParser.parse(dxfContent);
+          this.logStep("DXF parsing completed, extracting geometric entities");
+        } catch (parseError) {
+          // Fallback to manual parsing if library parsing fails
+          this.logStep("Standard parsing failed, using fallback method");
+          dxfData = this.parseBasicDXF(dxfContent);
+        }
+
+        rawGeometricData = dxfData.entities?.map((entity: any) => ({
           type: entity.type,
           layer: entity.layer || 'DEFAULT',
           start: entity.start,
@@ -56,41 +65,41 @@ export class AuthenticCADProcessor {
           thickness: this.determineLineThickness(entity),
           isWall: this.isWallEntity(entity)
         })) || [];
-        
+
         const uniqueLayers = Array.from(new Set(rawGeometricData.map(g => g.layer)));
         fileMetadata = { 
           format: 'DXF',
           layers: uniqueLayers,
           entityCount: rawGeometricData.length
         };
-        
+
         this.logStep(`✅ DXF parsed: ${rawGeometricData.length} geometric entities extracted`);
-        
+
       } else if (fileExtension === '.pdf') {
         this.logStep('STEP 1.2: Processing PDF with architectural line extraction');
-        
+
         // For now, create sample PDF wall data since full PDF parsing requires complex libraries
         // In production, this would use specialized PDF CAD parsing libraries
         rawGeometricData = this.generateSamplePDFWalls();
-        
+
         fileMetadata = {
           format: 'PDF',
           pages: 1,
           extractedLines: rawGeometricData.length,
           note: 'PDF processing using geometric simulation - full PDF parsing requires additional libraries'
         };
-        
+
         this.logStep(`✅ PDF processed: Simulated ${rawGeometricData.length} wall segments from PDF`);
-        
+
       } else if (['.png', '.jpg', '.jpeg'].includes(fileExtension)) {
         this.logStep('STEP 1.3: Processing image with edge detection for wall identification');
-        
+
         const imageMetadata = await sharp(fileBuffer).metadata();
-        
+
         // Real image processing - edge detection simulation
         // In production, this would use computer vision libraries like OpenCV
         const edgeDetectionResult = await this.simulateEdgeDetection(fileBuffer);
-        
+
         rawGeometricData = edgeDetectionResult.map((edge, index) => ({
           type: 'LINE',
           layer: 'IMAGE_WALLS',
@@ -99,58 +108,58 @@ export class AuthenticCADProcessor {
           thickness: edge.thickness || 200,
           isWall: true
         }));
-        
+
         fileMetadata = {
           format: 'IMAGE',
           dimensions: `${imageMetadata.width}x${imageMetadata.height}`,
           detectedWalls: rawGeometricData.length
         };
-        
+
         this.logStep(`✅ Image processed: ${rawGeometricData.length} wall segments detected via edge detection`);
       }
-      
+
       // STEP 1 COMPLETE: Extract walls as black lines
       this.updateProgress(20, 'STEP 1 COMPLETE: Walls extracted and ready for black line display');
       const walls = this.extractWallsFromGeometry(rawGeometricData);
       this.logStep(`✅ STEP 1 RESULT: ${walls.length} walls extracted as black lines`);
-      
+
       // =================================================================
       // STEP 2: RESTRICTED AREAS - LIGHT BLUE ZONES
       // =================================================================
       this.updateProgress(35, 'STEP 2: Detecting restricted areas (stairs, elevators) - light blue zones...');
-      
+
       this.logStep('STEP 2.1: Analyzing geometric patterns for restricted areas');
       const restrictedAreas = this.extractRestrictedAreas(rawGeometricData);
-      
+
       this.logStep(`✅ STEP 2 COMPLETE: ${restrictedAreas.length} restricted areas detected (light blue)`);
-      
+
       // =================================================================
       // STEP 3: ENTRANCES/EXITS - RED AREAS
       // =================================================================
       this.updateProgress(50, 'STEP 3: Identifying entrances and exits - red areas...');
-      
+
       this.logStep('STEP 3.1: Detecting door openings and entrance patterns');
       const doors = this.extractDoorsAndEntrances(rawGeometricData);
       const entrances = doors.filter(door => (door as any).isEntrance);
-      
+
       this.logStep(`✅ STEP 3 COMPLETE: ${entrances.length} entrances/exits identified (red areas)`);
-      
+
       // =================================================================
       // ADDITIONAL PROCESSING FOR COMPLETE ANALYSIS
       // =================================================================
       this.updateProgress(65, 'Completing geometric analysis...');
-      
+
       const windows = this.extractWindows(rawGeometricData);
       const bounds = this.calculateFloorPlanBounds(rawGeometricData);
-      
+
       this.updateProgress(80, 'Calculating space analysis metrics...');
       const spaceAnalysis = {
         ...this.calculateSpaceAnalysis(walls, restrictedAreas, bounds),
         bounds
       };
-      
+
       this.updateProgress(95, 'Finalizing authentic CAD processing...');
-      
+
       const processedFloorPlan: ProcessedFloorPlan = {
         id: this.generateUniqueId(),
         fileName,
@@ -174,16 +183,63 @@ export class AuthenticCADProcessor {
           ]
         }
       };
-      
+
       this.updateProgress(100, '✅ Authentic CAD processing complete - Ready for îlot placement');
       this.logStep(`🎯 AUTHENTIC PROCESSING COMPLETE: All 3 critical steps implemented`);
-      
+
       return processedFloorPlan;
-      
+
     } catch (error) {
       this.logStep(`❌ Error in authentic CAD processing: ${error}`);
       throw new Error(`Authentic CAD processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private parseBasicDXF(content: string): any {
+    // Basic DXF parsing for LINE entities (walls)
+    const lines = content.split('\n');
+    const entities = [];
+
+    let currentEntity: any = null;
+    let currentGroup = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (line === '0') {
+        if (currentEntity && currentEntity.type === 'LINE') {
+          entities.push(currentEntity);
+        }
+        currentEntity = { type: '', points: [] };
+        currentGroup = '0';
+        continue;
+      }
+
+      if (currentGroup === '0' && line === 'LINE') {
+        currentEntity.type = 'LINE';
+        continue;
+      }
+
+      // Extract coordinates
+      if (line === '10' && i + 1 < lines.length) {
+        if (!currentEntity.start) currentEntity.start = {};
+        currentEntity.start.x = parseFloat(lines[i + 1]);
+      }
+      if (line === '20' && i + 1 < lines.length) {
+        if (!currentEntity.start) currentEntity.start = {};
+        currentEntity.start.y = parseFloat(lines[i + 1]);
+      }
+      if (line === '11' && i + 1 < lines.length) {
+        if (!currentEntity.end) currentEntity.end = {};
+        currentEntity.end.x = parseFloat(lines[i + 1]);
+      }
+      if (line === '21' && i + 1 < lines.length) {
+        if (!currentEntity.end) currentEntity.end = {};
+        currentEntity.end.y = parseFloat(lines[i + 1]);
+      }
+    }
+
+    return { entities: entities };
   }
 
   /**
@@ -191,7 +247,7 @@ export class AuthenticCADProcessor {
    */
   private extractWallsFromGeometry(geometryData: any[]): Wall[] {
     const walls: Wall[] = [];
-    
+
     geometryData.forEach((geom, index) => {
       if (geom.type === 'LINE' && geom.isWall) {
         walls.push({
@@ -215,8 +271,62 @@ export class AuthenticCADProcessor {
         }
       }
     });
-    
+
     return walls;
+  }
+
+  private extractWallsFromDXF(dxfData: any): ProcessedFloorPlan {
+    // Extract LINE entities (walls) - handle different formats
+    let lineEntities = [];
+
+    if (dxfData.entities?.LINE) {
+      lineEntities = dxfData.entities.LINE;
+    } else if (Array.isArray(dxfData.entities)) {
+      lineEntities = dxfData.entities.filter((entity: any) => entity.type === 'LINE');
+    }
+
+    this.logProgress(25, `Found ${lineEntities.length} potential wall segments`);
+
+    const walls: Wall[] = lineEntities
+      .filter((line: any) => {
+        return (line.vertices?.length >= 2) || (line.start && line.end);
+      })
+      .map((line: any, index: number) => {
+        let points = [];
+
+        if (line.vertices?.length >= 2) {
+          points = line.vertices.slice(0, 2).map((vertex: any) => ({
+            x: vertex.x || 0,
+            y: vertex.y || 0
+          }));
+        } else if (line.start && line.end) {
+          points = [
+            { x: line.start.x || 0, y: line.start.y || 0 },
+            { x: line.end.x || 0, y: line.end.y || 0 }
+          ];
+        }
+
+        return {
+          id: `wall_${index}`,
+          points,
+          thickness: 200, // Default 20cm wall thickness
+          material: 'concrete'
+        };
+      });
+
+    return {
+      id: this.generateUniqueId(),
+      fileName: 'dxf_file',
+      fileType: '.dxf',
+      uploadDate: new Date(),
+      walls: walls,
+      doors: [],
+      windows: [],
+      restrictedAreas: [],
+      bounds: {minX: 0, maxX: 100, minY: 0, maxY: 100},
+      spaceAnalysis: {totalArea: 0, usableArea: 0, wallArea: 0, restrictedArea: 0, efficiency: 0},
+      metadata: {processingLogs: [], processingTime: 0, authenticProcessing: false, stepsCompleted: []}
+    };
   }
 
   /**
@@ -224,7 +334,7 @@ export class AuthenticCADProcessor {
    */
   private extractRestrictedAreas(geometryData: any[]): RestrictedArea[] {
     const restrictedAreas: RestrictedArea[] = [];
-    
+
     // Look for rectangular patterns that indicate stairs, elevators, etc.
     geometryData.forEach((geom, index) => {
       if (this.isRestrictedAreaPattern(geom)) {
@@ -237,7 +347,7 @@ export class AuthenticCADProcessor {
         });
       }
     });
-    
+
     return restrictedAreas;
   }
 
@@ -246,11 +356,11 @@ export class AuthenticCADProcessor {
    */
   private extractDoorsAndEntrances(geometryData: any[]): Door[] {
     const doors: Door[] = [];
-    
+
     geometryData.forEach((geom, index) => {
       if (this.isDoorPattern(geom)) {
         const isEntrance = this.isEntrancePattern(geom);
-        
+
         doors.push({
           id: `door_${index}`,
           position: this.getDoorPosition(geom),
@@ -263,7 +373,7 @@ export class AuthenticCADProcessor {
         });
       }
     });
-    
+
     return doors;
   }
 
@@ -272,7 +382,7 @@ export class AuthenticCADProcessor {
    */
   private extractWindows(geometryData: any[]): Window[] {
     const windows: Window[] = [];
-    
+
     geometryData.forEach((geom, index) => {
       if (this.isWindowPattern(geom)) {
         windows.push({
@@ -284,7 +394,7 @@ export class AuthenticCADProcessor {
         });
       }
     });
-    
+
     return windows;
   }
 
@@ -303,7 +413,7 @@ export class AuthenticCADProcessor {
     // Simulate edge detection - in real implementation, use OpenCV or similar
     const edges = [];
     const baseSize = 100;
-    
+
     // Generate realistic wall patterns based on typical floor plan layouts
     for (let i = 0; i < 15; i++) {
       edges.push({
@@ -312,7 +422,7 @@ export class AuthenticCADProcessor {
         thickness: 200
       });
     }
-    
+
     for (let i = 0; i < 10; i++) {
       edges.push({
         start: { x: baseSize, y: baseSize + i * 300 },
@@ -320,7 +430,7 @@ export class AuthenticCADProcessor {
         thickness: 200
       });
     }
-    
+
     return edges;
   }
 
@@ -331,14 +441,14 @@ export class AuthenticCADProcessor {
         geom.layer?.toUpperCase().includes('ESCALIER')) {
       return true;
     }
-    
+
     // Look for rectangular patterns with specific dimensions
     if (geom.type === 'RECTANGLE' || geom.vertices?.length === 4) {
       const bounds = this.getGeometryBounds(geom);
       const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
       return area > 2000000 && area < 15000000; // 2-15 m² typical for stairs/elevators
     }
-    
+
     return false;
   }
 
@@ -392,7 +502,7 @@ export class AuthenticCADProcessor {
         maxY: Math.max(...ys)
       };
     }
-    
+
     if (geom.start && geom.end) {
       return {
         minX: Math.min(geom.start.x, geom.end.x),
@@ -401,7 +511,7 @@ export class AuthenticCADProcessor {
         maxY: Math.max(geom.start.y, geom.end.y)
       };
     }
-    
+
     return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   }
 
@@ -454,17 +564,17 @@ export class AuthenticCADProcessor {
 
   private calculateFloorPlanBounds(geometryData: any[]): Rectangle {
     const allPoints: Point[] = [];
-    
+
     geometryData.forEach(geom => {
       if (geom.start) allPoints.push(geom.start);
       if (geom.end) allPoints.push(geom.end);
       if (geom.vertices) allPoints.push(...geom.vertices);
     });
-    
+
     if (allPoints.length === 0) {
       return { minX: 0, maxX: 10000, minY: 0, maxY: 8000 };
     }
-    
+
     return {
       minX: Math.min(...allPoints.map(p => p.x)),
       maxX: Math.max(...allPoints.map(p => p.x)),
@@ -482,12 +592,12 @@ export class AuthenticCADProcessor {
       );
       return sum + (length * (wall.thickness || 150)) / 1000000;
     }, 0);
-    
+
     const restrictedArea = restrictedAreas.reduce((sum, area) => {
       const areaBounds = area.bounds;
       return sum + ((areaBounds.maxX - areaBounds.minX) * (areaBounds.maxY - areaBounds.minY)) / 1000000;
     }, 0);
-    
+
     return {
       totalArea,
       usableArea: totalArea - wallArea - restrictedArea,
@@ -509,9 +619,9 @@ export class AuthenticCADProcessor {
       message,
       timestamp: new Date()
     };
-    
+
     this.logStep(`[${progress}%] ${message}`);
-    
+
     if (this.processingCallback) {
       this.processingCallback(stage);
     }
@@ -521,7 +631,7 @@ export class AuthenticCADProcessor {
     // Generate realistic wall patterns for PDF files
     const walls = [];
     const baseSize = 500;
-    
+
     // Create a rectangular room structure
     walls.push({
       type: 'LINE',
@@ -531,7 +641,7 @@ export class AuthenticCADProcessor {
       thickness: 200,
       isWall: true
     });
-    
+
     walls.push({
       type: 'LINE',
       layer: 'PDF_WALLS',
@@ -540,7 +650,7 @@ export class AuthenticCADProcessor {
       thickness: 200,
       isWall: true
     });
-    
+
     walls.push({
       type: 'LINE',
       layer: 'PDF_WALLS',
@@ -549,7 +659,7 @@ export class AuthenticCADProcessor {
       thickness: 200,
       isWall: true
     });
-    
+
     walls.push({
       type: 'LINE',
       layer: 'PDF_WALLS',
@@ -558,7 +668,7 @@ export class AuthenticCADProcessor {
       thickness: 200,
       isWall: true
     });
-    
+
     // Add internal walls
     walls.push({
       type: 'LINE',
@@ -568,7 +678,7 @@ export class AuthenticCADProcessor {
       thickness: 150,
       isWall: true
     });
-    
+
     return walls;
   }
 
