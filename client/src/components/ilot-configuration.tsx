@@ -85,10 +85,8 @@ export default function IlotConfiguration({
         description: "Failed to generate îlot layout. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsGenerating(false);
     }
-  };
+  }, [floorPlan, settings, onIlotsGenerated, toast]);
 
   return (
     <Card className="border-0 shadow-none">
