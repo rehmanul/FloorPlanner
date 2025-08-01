@@ -178,67 +178,63 @@ export class AdvancedIlotPlacementEngine {
   ): Promise<void> {
     console.log('🧠 Executing Advanced AI Placement Algorithm');
     
-    const populationSize = 50;
-    const generations = 100;
-    const eliteRatio = 0.2;
-    const mutationRate = 0.15;
+    // Simple but effective placement algorithm
+    const bounds = floorPlan.bounds;
+    const usableWidth = bounds.maxX - bounds.minX - (this.settings.minClearance * 2);
+    const usableHeight = bounds.maxY - bounds.minY - (this.settings.minClearance * 2);
     
-    // Initialize diverse population
-    let population = this.createDiversePopulation(sizes, floorPlan, populationSize);
+    console.log(`Available space: ${usableWidth}x${usableHeight}mm`);
     
-    for (let generation = 0; generation < generations; generation++) {
-      // Advanced fitness evaluation
-      const evaluatedPopulation = population.map(individual => ({
-        individual,
-        fitness: this.calculateAdvancedFitness(individual, floorPlan)
-      }));
+    let placedCount = 0;
+    const maxAttempts = sizes.length * 10;
+    
+    for (let sizeIndex = 0; sizeIndex < sizes.length && placedCount < Math.floor(sizes.length * 0.8); sizeIndex++) {
+      const size = sizes[sizeIndex];
+      let placed = false;
       
-      // Sort by fitness
-      evaluatedPopulation.sort((a, b) => b.fitness.overallScore - a.fitness.overallScore);
-      
-      // Track best solution
-      const currentBest = evaluatedPopulation[0];
-      if (currentBest.fitness.overallScore > this.bestScore) {
-        this.bestScore = currentBest.fitness.overallScore;
-        this.bestSolution = [...currentBest.individual];
-        console.log(`🎯 New best score: ${this.bestScore.toFixed(4)} (Gen ${generation})`);
-      }
-      
-      this.convergenceHistory.push(this.bestScore);
-      
-      // Check convergence
-      if (this.hasConverged()) {
-        console.log(`🏁 Converged at generation ${generation}`);
-        break;
-      }
-      
-      // Create next generation
-      const nextGeneration: Ilot[] = [];
-      const eliteCount = Math.floor(populationSize * eliteRatio);
-      
-      // Elitism
-      for (let i = 0; i < eliteCount; i++) {
-        nextGeneration.push(...evaluatedPopulation[i].individual);
-      }
-      
-      // Advanced breeding
-      while (nextGeneration.length < populationSize) {
-        const parent1 = this.tournamentSelection(evaluatedPopulation);
-        const parent2 = this.tournamentSelection(evaluatedPopulation);
+      // Try multiple positions for each îlot
+      for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
+        // Generate random position within bounds
+        const x = bounds.minX + this.settings.minClearance + 
+                 Math.random() * (usableWidth - size.width);
+        const y = bounds.minY + this.settings.minClearance + 
+                 Math.random() * (usableHeight - size.height);
         
-        let offspring = this.advancedCrossover(parent1, parent2, floorPlan);
+        const candidate = {
+          x: Math.round(x),
+          y: Math.round(y),
+          width: size.width,
+          height: size.height
+        };
         
-        if (Math.random() < mutationRate) {
-          offspring = this.intelligentMutation(offspring, floorPlan);
+        // Check if this position is valid
+        if (this.isValidPlacement(candidate, ilots, floorPlan)) {
+          const newIlot: Ilot = {
+            id: `ilot_${placedCount}`,
+            x: candidate.x,
+            y: candidate.y,
+            width: candidate.width,
+            height: candidate.height,
+            area: (candidate.width * candidate.height) / 10000, // Convert to m²
+            type: size.type
+          };
+          
+          ilots.push(newIlot);
+          this.bestSolution.push(newIlot);
+          placedCount++;
+          placed = true;
+          
+          console.log(`✅ Placed îlot ${placedCount}: ${size.type} at (${candidate.x}, ${candidate.y})`);
         }
-        
-        nextGeneration.push(...offspring);
       }
       
-      population = [nextGeneration.slice(0, populationSize)];
+      if (!placed) {
+        console.log(`⚠️ Could not place îlot of type ${size.type}`);
+      }
     }
     
-    ilots.push(...this.bestSolution);
+    this.bestScore = placedCount / sizes.length; // Simple fitness score
+    console.log(`🎯 Placement complete: ${placedCount} îlots placed out of ${sizes.length} requested`);
   }
 
   private async neuralGeneticPlacement(
@@ -384,24 +380,39 @@ export class AdvancedIlotPlacementEngine {
 
   private cornerFirstStrategy(sizes: IlotSize[], individual: Ilot[], floorPlan: ProcessedFloorPlan): void {
     const bounds = floorPlan.bounds;
-    const corners = [
-      { x: bounds.minX + 100, y: bounds.minY + 100 },
-      { x: bounds.maxX - 100, y: bounds.minY + 100 },
-      { x: bounds.maxX - 100, y: bounds.maxY - 100 },
-      { x: bounds.minX + 100, y: bounds.maxY - 100 }
-    ];
+    const margin = this.settings.minClearance;
     
-    let cornerIndex = 0;
+    // Start from top-left and work across then down
+    let currentX = bounds.minX + margin;
+    let currentY = bounds.minY + margin;
+    let rowHeight = 0;
     
     sizes.forEach((size, index) => {
-      if (individual.length >= Math.floor(sizes.length * 0.8)) return;
+      if (individual.length >= Math.floor(sizes.length * 0.6)) return;
       
-      const corner = corners[cornerIndex % corners.length];
-      const candidate = this.createCornerCandidate(corner, size, bounds, cornerIndex);
+      // Check if we need to move to next row
+      if (currentX + size.width + margin > bounds.maxX) {
+        currentX = bounds.minX + margin;
+        currentY += rowHeight + this.settings.corridorWidth;
+        rowHeight = 0;
+      }
+      
+      // Check if we have vertical space
+      if (currentY + size.height + margin > bounds.maxY) {
+        return; // No more space
+      }
+      
+      const candidate = {
+        x: currentX,
+        y: currentY,
+        width: size.width,
+        height: size.height
+      };
       
       if (this.isValidPlacement(candidate, individual, floorPlan)) {
-        individual.push(this.candidateToIlot(candidate, `ilot_corner_${index}`));
-        cornerIndex++;
+        individual.push(this.candidateToIlot(candidate, `ilot_grid_${index}`));
+        currentX += size.width + this.settings.corridorWidth;
+        rowHeight = Math.max(rowHeight, size.height);
       }
     });
   }
@@ -591,20 +602,47 @@ export class AdvancedIlotPlacementEngine {
     
     if (ilots.length === 0) return corridors;
     
-    // Generate primary circulation spine
-    const primarySpine = this.generatePrimarySpine(ilots, floorPlan);
-    if (primarySpine) corridors.push(primarySpine);
+    const bounds = floorPlan.bounds;
     
-    // Generate secondary corridors
-    const secondaryCorridors = this.generateSecondaryCorridors(ilots, floorPlan);
-    corridors.push(...secondaryCorridors);
+    // Generate main horizontal corridor
+    if (ilots.length > 1) {
+      const centerY = (bounds.minY + bounds.maxY) / 2;
+      corridors.push({
+        id: 'main_horizontal',
+        x1: bounds.minX + this.settings.minClearance,
+        y1: centerY,
+        x2: bounds.maxX - this.settings.minClearance,
+        y2: centerY,
+        width: this.settings.corridorWidth,
+        type: 'horizontal'
+      });
+    }
     
-    // Generate door connections
-    const doorConnections = this.generateDoorConnections(ilots, floorPlan);
-    corridors.push(...doorConnections);
+    // Generate vertical corridors connecting to îlots
+    const sortedIlots = [...ilots].sort((a, b) => a.x - b.x);
     
-    // Optimize corridor network
-    return this.optimizeCorridorNetwork(corridors);
+    for (let i = 0; i < sortedIlots.length - 1; i++) {
+      const ilot1 = sortedIlots[i];
+      const ilot2 = sortedIlots[i + 1];
+      
+      // Add vertical corridor between îlots if they're far apart
+      const distance = ilot2.x - (ilot1.x + ilot1.width);
+      if (distance > this.settings.corridorWidth * 2) {
+        const corridorX = ilot1.x + ilot1.width + distance / 2;
+        corridors.push({
+          id: `vertical_${i}`,
+          x1: corridorX,
+          y1: bounds.minY + this.settings.minClearance,
+          x2: corridorX,
+          y2: bounds.maxY - this.settings.minClearance,
+          width: this.settings.corridorWidth,
+          type: 'vertical'
+        });
+      }
+    }
+    
+    console.log(`✅ Generated ${corridors.length} corridors`);
+    return corridors;
   }
 
   // Utility methods
