@@ -40,7 +40,14 @@ interface AppState {
   rightDrawerOpen: boolean;
 }
 
+// Import the responsive component
+import ResponsiveFloorPlanAnalyzer from "./responsive-floor-plan-analyzer";
+
 export default function FloorPlanAnalyzer() {
+  return <ResponsiveFloorPlanAnalyzer />;
+}
+
+function LegacyFloorPlanAnalyzer() {
   const { toast } = useToast();
   // Remove old canvas ref - now using pixel-perfect renderer
   
