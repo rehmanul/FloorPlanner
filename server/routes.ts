@@ -14,7 +14,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['.dxf', '.dwg', '.pdf', '.jpg', '.jpeg', '.png'];
     const fileExt = '.' + file.originalname.split('.').pop()?.toLowerCase();
-    
+
     if (allowedTypes.includes(fileExt)) {
       cb(null, true);
     } else {
@@ -24,7 +24,7 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+
   // Upload and process floor plan
   app.post('/api/floor-plans', upload.single('file'), async (req, res) => {
     try {
@@ -82,18 +82,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/floor-plans/:id/status', async (req, res) => {
     try {
       const { status, geometryData, spaceAnalysis } = req.body;
-      
+
       const updatedFloorPlan = await storage.updateFloorPlanStatus(
         req.params.id,
         status,
         geometryData,
         spaceAnalysis
       );
-      
+
       if (!updatedFloorPlan) {
         return res.status(404).json({ message: 'Floor plan not found' });
       }
-      
+
       res.json(updatedFloorPlan);
     } catch (error) {
       console.error('Update floor plan status error:', error);
@@ -146,11 +146,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const layoutData = insertIlotLayoutSchema.parse(req.body);
       const updatedLayout = await storage.updateIlotLayout(req.params.id, layoutData);
-      
+
       if (!updatedLayout) {
         return res.status(404).json({ message: 'Îlot layout not found' });
       }
-      
+
       res.json(updatedLayout);
     } catch (error) {
       console.error('Update îlot layout error:', error);
