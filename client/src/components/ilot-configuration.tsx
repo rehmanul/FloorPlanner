@@ -36,7 +36,12 @@ export default function IlotConfiguration({
 }: IlotConfigurationProps) {
   const { toast } = useToast();
 
-  const handleGenerateLayout = useCallback(async () => {
+  const handleGenerateLayout = useCallback(async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    console.log('Generate Layout button clicked!', { floorPlan: !!floorPlan, processing });
+    
     if (!floorPlan) {
       toast({
         title: "No Floor Plan",
@@ -50,8 +55,18 @@ export default function IlotConfiguration({
       // Import the real placement engine
       const { RealIlotPlacementEngine } = await import('@/lib/real-ilot-placement');
 
-      // Create placement engine with current settings
-      const placementEngine = new RealIlotPlacementEngine(floorPlan, settings);
+      // Convert settings to expected format
+      const placementSettings = {
+        ilotDimensions: { width: 3000, height: 2000 }, // Default îlot size in mm
+        corridorWidth: settings.corridorWidth,
+        algorithm: settings.algorithm as 'intelligent' | 'grid' | 'genetic' | 'simulated-annealing',
+        density: settings.density / 100, // Convert to decimal
+        spacing: 500, // Default spacing
+        minClearance: settings.minClearance
+      };
+
+      // Create placement engine with converted settings
+      const placementEngine = new RealIlotPlacementEngine(floorPlan, placementSettings);
 
       // Generate real layout
       const result = await new Promise<any>((resolve) => {
@@ -89,14 +104,14 @@ export default function IlotConfiguration({
   }, [floorPlan, settings, onIlotsGenerated, toast]);
 
   return (
-    <Card className="border-0 shadow-none">
+    <Card className="border-0 shadow-none relative z-20">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-gray-700 flex items-center">
           <Settings className="w-4 h-4 mr-2" />
           Îlot Configuration
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 relative z-20">
         {/* Density Control */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -212,9 +227,10 @@ export default function IlotConfiguration({
 
         {/* Generate Button */}
         <Button
+          type="button"
           onClick={handleGenerateLayout}
           disabled={!floorPlan || processing}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white relative z-10"
         >
           {processing ? (
             <div className="flex items-center">
