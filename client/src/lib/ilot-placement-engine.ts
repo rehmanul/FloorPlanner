@@ -112,35 +112,53 @@ export class AdvancedIlotPlacementEngine {
     const spaceWidth = floorPlan.bounds.maxX - floorPlan.bounds.minX;
     const aspectRatio = spaceWidth / spaceDepth;
     
+    // Calculate maximum reasonable îlot size based on available space
+    const maxWidth = Math.min(spaceWidth * 0.3, 200); // Max 30% of space width or 200mm
+    const maxHeight = Math.min(spaceDepth * 0.3, 150); // Max 30% of space height or 150mm
+    
     // Dynamic size definitions based on space analysis
     const baseSizes: IlotSize[] = [
-      { type: 'small', width: 120, height: 80, weight: 0.4, priority: 1 },
-      { type: 'medium', width: 160, height: 100, weight: 0.35, priority: 2 },
-      { type: 'large', width: 200, height: 120, weight: 0.2, priority: 3 },
-      { type: 'xlarge', width: 240, height: 140, weight: 0.05, priority: 4 }
-    ];
+      { type: 'small', width: Math.min(120, maxWidth * 0.6), height: Math.min(80, maxHeight * 0.6), weight: 0.5, priority: 1 },
+      { type: 'medium', width: Math.min(160, maxWidth * 0.8), height: Math.min(100, maxHeight * 0.8), weight: 0.3, priority: 2 },
+      { type: 'large', width: Math.min(200, maxWidth), height: Math.min(120, maxHeight), weight: 0.15, priority: 3 },
+      { type: 'xlarge', width: Math.min(240, maxWidth * 1.2), height: Math.min(140, maxHeight * 1.2), weight: 0.05, priority: 4 }
+    ].filter(size => size.width >= 50 && size.height >= 40); // Filter out too small sizes
+    
+    if (baseSizes.length === 0) {
+      console.log('⚠️ Space too small for any îlots');
+      return [];
+    }
+    
+    // Calculate reasonable target count based on area
+    const minIlotArea = (baseSizes[0].width * baseSizes[0].height) / 10000; // Convert to m²
+    const maxPossibleIlots = Math.floor(targetArea / minIlotArea);
+    const targetTotalIlots = Math.min(maxPossibleIlots, 20); // Cap at 20 îlots
+    
+    if (targetTotalIlots <= 0) {
+      console.log('⚠️ Target area too small for îlots');
+      return [];
+    }
     
     // Intelligent size adaptation
     baseSizes.forEach(def => {
       const adjustedSize = this.adaptSizeToSpace(def, floorPlan, aspectRatio);
-      const targetCount = Math.floor((targetArea * adjustedSize.weight) / 
-                                   ((adjustedSize.width * adjustedSize.height) / 10000));
+      const targetCount = Math.max(1, Math.floor(targetTotalIlots * adjustedSize.weight));
       
       for (let i = 0; i < targetCount; i++) {
         // Intelligent variation for realistic placement
-        const variationFactor = 0.15; // 15% variation
+        const variationFactor = 0.1; // 10% variation
         const widthVariation = 1 + (Math.random() - 0.5) * variationFactor;
         const heightVariation = 1 + (Math.random() - 0.5) * variationFactor;
         
         sizes.push({
           ...adjustedSize,
-          width: Math.round(adjustedSize.width * widthVariation),
-          height: Math.round(adjustedSize.height * heightVariation)
+          width: Math.round(Math.max(50, adjustedSize.width * widthVariation)),
+          height: Math.round(Math.max(40, adjustedSize.height * heightVariation))
         });
       }
     });
     
-    return sizes.sort((a, b) => b.priority - a.priority);
+    return sizes.sort((a, b) => a.priority - b.priority); // Start with smallest sizes
   }
 
   private adaptSizeToSpace(size: IlotSize, floorPlan: ProcessedFloorPlan, aspectRatio: number): IlotSize {
@@ -178,27 +196,52 @@ export class AdvancedIlotPlacementEngine {
   ): Promise<void> {
     console.log('🧠 Executing Advanced AI Placement Algorithm');
     
-    // Simple but effective placement algorithm
+    // Calculate available space with adaptive clearance
     const bounds = floorPlan.bounds;
-    const usableWidth = bounds.maxX - bounds.minX - (this.settings.minClearance * 2);
-    const usableHeight = bounds.maxY - bounds.minY - (this.settings.minClearance * 2);
+    const totalWidth = bounds.maxX - bounds.minX;
+    const totalHeight = bounds.maxY - bounds.minY;
     
-    console.log(`Available space: ${usableWidth}x${usableHeight}mm`);
+    // Adaptive clearance - reduce if space is too small
+    let adaptiveClearance = this.settings.minClearance;
+    if (totalWidth < 1000 || totalHeight < 1000) {
+      adaptiveClearance = Math.min(this.settings.minClearance, 30); // Minimum 30mm clearance
+    }
+    
+    const usableWidth = totalWidth - (adaptiveClearance * 2);
+    const usableHeight = totalHeight - (adaptiveClearance * 2);
+    
+    console.log(`Available space: ${usableWidth}x${usableHeight}mm (adaptive clearance: ${adaptiveClearance}mm)`);
+    
+    // Check if we have enough space
+    if (usableWidth <= 0 || usableHeight <= 0) {
+      console.log('⚠️ Insufficient space for îlot placement');
+      return;
+    }
     
     let placedCount = 0;
-    const maxAttempts = sizes.length * 10;
+    const maxAttemptsPerIlot = 50;
+    const maxTotalAttempts = sizes.length * maxAttemptsPerIlot;
     
     for (let sizeIndex = 0; sizeIndex < sizes.length && placedCount < Math.floor(sizes.length * 0.8); sizeIndex++) {
       const size = sizes[sizeIndex];
       let placed = false;
       
+      // Skip if îlot is too large for available space
+      if (size.width > usableWidth || size.height > usableHeight) {
+        console.log(`⚠️ Îlot ${size.type} (${size.width}x${size.height}) too large for space`);
+        continue;
+      }
+      
       // Try multiple positions for each îlot
-      for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
+      for (let attempt = 0; attempt < maxAttemptsPerIlot && !placed; attempt++) {
         // Generate random position within bounds
-        const x = bounds.minX + this.settings.minClearance + 
-                 Math.random() * (usableWidth - size.width);
-        const y = bounds.minY + this.settings.minClearance + 
-                 Math.random() * (usableHeight - size.height);
+        const maxX = usableWidth - size.width;
+        const maxY = usableHeight - size.height;
+        
+        if (maxX <= 0 || maxY <= 0) break; // Not enough space
+        
+        const x = bounds.minX + adaptiveClearance + Math.random() * maxX;
+        const y = bounds.minY + adaptiveClearance + Math.random() * maxY;
         
         const candidate = {
           x: Math.round(x),
@@ -208,7 +251,7 @@ export class AdvancedIlotPlacementEngine {
         };
         
         // Check if this position is valid
-        if (this.isValidPlacement(candidate, ilots, floorPlan)) {
+        if (this.isValidPlacement(candidate, ilots, floorPlan, adaptiveClearance)) {
           const newIlot: Ilot = {
             id: `ilot_${placedCount}`,
             x: candidate.x,
@@ -233,7 +276,7 @@ export class AdvancedIlotPlacementEngine {
       }
     }
     
-    this.bestScore = placedCount / sizes.length; // Simple fitness score
+    this.bestScore = placedCount / Math.max(sizes.length, 1); // Simple fitness score
     console.log(`🎯 Placement complete: ${placedCount} îlots placed out of ${sizes.length} requested`);
   }
 
@@ -661,28 +704,29 @@ export class AdvancedIlotPlacementEngine {
     return squaredDiffs.reduce((sum, diff) => sum + diff, 0) / values.length;
   }
 
-  private isValidPlacement(candidate: Rectangle, existingIlots: Ilot[], floorPlan: ProcessedFloorPlan): boolean {
+  private isValidPlacement(candidate: Rectangle, existingIlots: Ilot[], floorPlan: ProcessedFloorPlan, clearance?: number): boolean {
     // Enhanced validation with multiple checks
     const bounds = floorPlan.bounds;
+    const minClearance = clearance || this.settings.minClearance;
     
     // Bounds check
-    if (candidate.x < bounds.minX + this.settings.minClearance || 
-        candidate.x + candidate.width > bounds.maxX - this.settings.minClearance ||
-        candidate.y < bounds.minY + this.settings.minClearance || 
-        candidate.y + candidate.height > bounds.maxY - this.settings.minClearance) {
+    if (candidate.x < bounds.minX + minClearance || 
+        candidate.x + candidate.width > bounds.maxX - minClearance ||
+        candidate.y < bounds.minY + minClearance || 
+        candidate.y + candidate.height > bounds.maxY - minClearance) {
       return false;
     }
 
     // Overlap check with existing îlots
     for (const existing of existingIlots) {
-      if (this.utils.rectanglesOverlap(candidate, existing, this.settings.minClearance)) {
+      if (this.utils.rectanglesOverlap(candidate, existing, minClearance)) {
         return false;
       }
     }
 
     // Restricted areas check
     for (const restricted of floorPlan.restrictedAreas) {
-      if (this.utils.rectanglesOverlap(candidate, restricted.bounds, this.settings.minClearance)) {
+      if (this.utils.rectanglesOverlap(candidate, restricted.bounds, minClearance)) {
         return false;
       }
     }
@@ -690,7 +734,7 @@ export class AdvancedIlotPlacementEngine {
     // Door clearance check
     for (const door of floorPlan.doors) {
       const distance = this.utils.distanceFromPointToRectangle(door.center, candidate);
-      if (distance < door.radius + this.settings.minClearance) {
+      if (distance < door.radius + minClearance) {
         return false;
       }
     }
