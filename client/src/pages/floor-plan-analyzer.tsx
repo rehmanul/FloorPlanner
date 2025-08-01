@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Upload, Zap, Save, Eye, Menu, Settings, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import FileUpload from "@/components/file-upload";
+import IlotConfiguration from "@/components/ilot-configuration";
+import LayerControls from "@/components/layer-controls";
+import AnalysisTools from "@/components/analysis-tools";
+import CADCanvas from '@/components/cad-canvas';
+import AnalyticsPanel from '@/components/analytics-panel';
 import PixelPerfectCADRenderer from "@/components/pixel-perfect-cad-renderer";
 import AnalysisTools from "@/components/analysis-tools";
 import IlotConfiguration from "@/components/ilot-configuration";
@@ -50,7 +55,7 @@ export default function FloorPlanAnalyzer() {
 function LegacyFloorPlanAnalyzer() {
   const { toast } = useToast();
   // Remove old canvas ref - now using pixel-perfect renderer
-  
+
   const [appState, setAppState] = useState<AppState>({
     currentFile: null,
     floorPlan: null,
@@ -87,7 +92,7 @@ function LegacyFloorPlanAnalyzer() {
       floorPlan,
       processing: false
     }));
-    
+
     toast({
       title: "File Processed Successfully",
       description: "Floor plan is ready for îlot placement.",
@@ -107,7 +112,7 @@ function LegacyFloorPlanAnalyzer() {
       analytics,
       processing: false
     }));
-    
+
     toast({
       title: "Layout Generated",
       description: `Generated ${ilots.length} îlots with ${corridors.length} corridors.`,
@@ -141,7 +146,7 @@ function LegacyFloorPlanAnalyzer() {
       });
       return;
     }
-    
+
     setAppState(prev => ({ ...prev, processing: true }));
     // Trigger automatic îlot generation with current settings
     // This would be handled by the IlotConfiguration component
@@ -156,7 +161,7 @@ function LegacyFloorPlanAnalyzer() {
       });
       return;
     }
-    
+
     // Implement save functionality
     toast({
       title: "Project Saved",
@@ -244,19 +249,19 @@ function LegacyFloorPlanAnalyzer() {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto">
               <FileUpload
                 onFileProcessed={handleFileProcessed}
                 onProcessingUpdate={handleProcessingUpdate}
                 processing={appState.processing}
               />
-              
+
               <AnalysisTools
                 selectedTool={appState.selectedTool}
                 onToolChange={handleToolChange}
               />
-              
+
               <IlotConfiguration
                 settings={appState.settings}
                 floorPlan={appState.floorPlan}
@@ -264,7 +269,7 @@ function LegacyFloorPlanAnalyzer() {
                 onIlotsGenerated={handleIlotsGenerated}
                 processing={appState.processing}
               />
-              
+
               <LayerControls
                 layers={appState.layers}
                 onLayerToggle={handleLayerToggle}
@@ -294,7 +299,7 @@ function LegacyFloorPlanAnalyzer() {
               </Button>
             )}
           </div>
-          
+
           <div className="absolute top-4 right-4 z-30 flex space-x-2 pointer-events-auto">
             {!appState.rightDrawerOpen && (
               <Button
@@ -313,9 +318,9 @@ function LegacyFloorPlanAnalyzer() {
               </Button>
             )}
           </div>
-          
+
           {/* Remove keyboard shortcuts hint as requested */}
-          
+
           <PixelPerfectCADRenderer
             floorPlan={appState.floorPlan}
             ilots={appState.ilots}
@@ -347,7 +352,7 @@ function LegacyFloorPlanAnalyzer() {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto">
               <RealAnalyticsPanel
                 floorPlan={appState.floorPlan}
