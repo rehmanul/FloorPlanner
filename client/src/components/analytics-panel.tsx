@@ -244,5 +244,3 @@ function calculateAverageIlotSize(ilots: any[]): number {
 }
 
 AnalyticsPanel.displayName = 'AnalyticsPanel';
-
-export default AnalyticsPanel;
