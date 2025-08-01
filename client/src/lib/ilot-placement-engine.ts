@@ -216,87 +216,76 @@ export class AdvancedIlotPlacementEngine {
     
     console.log(`Space bounds: ${totalWidth}x${totalHeight}mm, using ${adaptiveClearance}mm clearance`);
     
-    // Find open areas within the floor plan for placement
-    const placementZones = this.identifyPlacementZones(floorPlan, adaptiveClearance);
-    
-    if (placementZones.length === 0) {
-      console.log('⚠️ No suitable placement zones found');
-      return;
-    }
-    
-    console.log(`Found ${placementZones.length} placement zones`);
-    
+    // Simplified placement approach to avoid freezing
     let placedCount = 0;
-    const maxAttemptsPerIlot = 100;
+    const maxIlots = Math.min(sizes.length, 15); // Limit to prevent freezing
+    const gridSpacing = 300; // 300mm spacing
     
-    // Try to place each îlot in the best available zones
-    for (let sizeIndex = 0; sizeIndex < sizes.length && placedCount < Math.floor(sizes.length * 0.9); sizeIndex++) {
-      const size = sizes[sizeIndex];
-      let placed = false;
+    // Create a simple grid placement
+    const startX = bounds.minX + adaptiveClearance;
+    const startY = bounds.minY + adaptiveClearance;
+    const cols = Math.floor((totalWidth - adaptiveClearance * 2) / gridSpacing);
+    const rows = Math.floor((totalHeight - adaptiveClearance * 2) / gridSpacing);
+    
+    console.log(`Grid: ${cols}x${rows}, attempting to place ${maxIlots} îlots`);
+    
+    for (let i = 0; i < maxIlots && placedCount < maxIlots; i++) {
+      const size = sizes[i % sizes.length];
+      const row = Math.floor(i / cols);
+      const col = i % cols;
       
-      // Sort zones by suitability for this îlot size
-      const suitableZones = placementZones
-        .filter(zone => zone.width >= size.width + 20 && zone.height >= size.height + 20)
-        .sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      if (row >= rows) break; // No more space
       
-      if (suitableZones.length === 0) {
-        console.log(`⚠️ No suitable zones for îlot ${size.type} (${size.width}x${size.height})`);
-        continue;
-      }
+      const candidate = {
+        x: startX + col * gridSpacing,
+        y: startY + row * gridSpacing,
+        width: size.width,
+        height: size.height
+      };
       
-      // Try placement in each suitable zone
-      for (const zone of suitableZones) {
-        if (placed) break;
+      // Simple validation - just check bounds and basic overlaps
+      if (candidate.x + candidate.width <= bounds.maxX - adaptiveClearance &&
+          candidate.y + candidate.height <= bounds.maxY - adaptiveClearance) {
         
-        for (let attempt = 0; attempt < maxAttemptsPerIlot && !placed; attempt++) {
-          // Generate position within this zone
-          const maxX = zone.width - size.width;
-          const maxY = zone.height - size.height;
-          
-          if (maxX <= 0 || maxY <= 0) continue;
-          
-          const x = zone.x + Math.random() * maxX;
-          const y = zone.y + Math.random() * maxY;
-          
-          const candidate = {
-            x: Math.round(x),
-            y: Math.round(y),
-            width: size.width,
-            height: size.height
+        // Quick overlap check
+        let overlaps = false;
+        for (const existing of ilots) {
+          if (!(candidate.x + candidate.width < existing.x ||
+                candidate.x > existing.x + existing.width ||
+                candidate.y + candidate.height < existing.y ||
+                candidate.y > existing.y + existing.height)) {
+            overlaps = true;
+            break;
+          }
+        }
+        
+        if (!overlaps) {
+          const newIlot: Ilot = {
+            id: `ilot_${placedCount + 1}`,
+            x: candidate.x,
+            y: candidate.y,
+            width: candidate.width,
+            height: candidate.height,
+            area: (candidate.width * candidate.height) / 1000000,
+            type: size.type
           };
           
-          // Check if this position is valid
-          if (this.isValidPlacement(candidate, ilots, floorPlan, 30)) {
-            const newIlot: Ilot = {
-              id: `ilot_${placedCount + 1}`,
-              x: candidate.x,
-              y: candidate.y,
-              width: candidate.width,
-              height: candidate.height,
-              area: (candidate.width * candidate.height) / 1000000, // Convert to m²
-              type: size.type
-            };
-            
-            ilots.push(newIlot);
-            this.bestSolution.push(newIlot);
-            placedCount++;
-            placed = true;
-            
-            console.log(`✅ Placed îlot ${placedCount}: ${size.type} (${size.width}x${size.height}) at (${candidate.x}, ${candidate.y})`);
-            
-            // Update zones to reflect occupied space
-            this.updatePlacementZones(placementZones, candidate, adaptiveClearance);
-          }
+          ilots.push(newIlot);
+          this.bestSolution.push(newIlot);
+          placedCount++;
+          
+          console.log(`✅ Placed îlot ${placedCount}: ${size.type} at (${candidate.x}, ${candidate.y})`);
         }
       }
       
-      if (!placed) {
-        console.log(`⚠️ Could not place îlot of type ${size.type}`);
+      // Add yield to prevent UI freezing
+      if (i % 5 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1));
       }
     }
     
-    this.bestScore = placedCount / Math.max(sizes.length, 1);
-    console.log(`🎯 Placement complete: ${placedCount} îlots placed out of ${sizes.length} requested`);
+    this.bestScore = placedCount / Math.max(maxIlots, 1);
+    console.log(`🎯 Placement complete: ${placedCount} îlots placed`);
   }
 
   private identifyPlacementZones(floorPlan: ProcessedFloorPlan, clearance: number): Array<{x: number, y: number, width: number, height: number}> {
