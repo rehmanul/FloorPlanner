@@ -47,49 +47,48 @@ export default function IlotConfiguration({
     }
 
     try {
-      // Use real îlot placement engine
-      const { RealIlotPlacementEngine } = await import('../lib/real-ilot-placement');
-      const placementSettings = {
-        density: settings.density,
-        corridorWidth: settings.corridorWidth,
-        minClearance: settings.minClearance,
-        algorithm: settings.algorithm as 'intelligent' | 'grid' | 'genetic' | 'simulated_annealing'
-      };
-      
-      const engine = new RealIlotPlacementEngine(floorPlan, placementSettings);
-      const { ilots, corridors } = engine.generateLayout();
+      // Import the real placement engine
+      const { RealIlotPlacementEngine } = await import('@/lib/real-ilot-placement');
 
-      // Calculate real analytics based on actual placement
-      const totalIlotArea = ilots.reduce((sum, ilot) => sum + ilot.area, 0);
-      const corridorLength = corridors.reduce((sum, corridor) => 
-        sum + Math.sqrt(Math.pow(corridor.x2 - corridor.x1, 2) + Math.pow(corridor.y2 - corridor.y1, 2)) / 1000, 0
-      ); // Convert mm to meters
-      
-      const analytics: LayoutAnalytics = {
-        totalIlots: ilots.length,
-        totalArea: totalIlotArea,
-        avgIlotSize: ilots.length > 0 ? totalIlotArea / ilots.length : 0,
-        corridorLength,
-        spaceEfficiency: (totalIlotArea / (floorPlan.spaceAnalysis.usableArea || 1)) * 100,
-        densityAchieved: (ilots.length / (floorPlan.spaceAnalysis.usableArea || 1)) * 100
-      };
+      // Create placement engine with current settings
+      const placementEngine = new RealIlotPlacementEngine(floorPlan, settings);
 
-      onIlotsGenerated(ilots, corridors, analytics);
-      
-      toast({
-        title: "Layout Generated",
-        description: `Successfully generated ${ilots.length} îlots using ${settings.algorithm} algorithm with ${corridors.length} corridors.`
+      // Generate real layout
+      const result = await new Promise<any>((resolve) => {
+        // Run in a setTimeout to allow UI to update
+        setTimeout(() => {
+          const layout = placementEngine.generateLayout();
+          resolve(layout);
+        }, 100);
       });
 
+      // Convert analytics to match expected interface
+      const analytics: LayoutAnalytics = {
+        totalArea: result.analytics.totalArea,
+        ilotArea: result.ilots.reduce((sum: number, ilot: Ilot) => sum + ilot.area, 0),
+        corridorLength: result.analytics.corridorLength,
+        occupancyRate: result.analytics.occupancyRate / 100,
+        efficiency: result.analytics.efficiency / 100,
+        accessibilityScore: Math.min(1, result.analytics.efficiency / 80) // Convert efficiency to accessibility score
+      };
+
+      onIlotsGenerated(result.ilots, result.corridors, analytics);
+
+      toast({
+        title: "Layout Generated Successfully",
+        description: `Generated ${result.ilots.length} îlots with ${result.corridors.length} corridors using ${settings.algorithm} algorithm.`,
+      });
     } catch (error) {
-      console.error("Layout generation error:", error);
+      console.error('Layout generation error:', error);
       toast({
         title: "Generation Failed",
-        description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to generate îlot layout. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsGenerating(false);
     }
-  }, [floorPlan, settings, onIlotsGenerated, toast]);
+  };
 
   return (
     <Card className="border-0 shadow-none">
