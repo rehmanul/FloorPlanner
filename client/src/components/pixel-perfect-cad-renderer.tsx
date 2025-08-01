@@ -90,6 +90,15 @@ export default function PixelPerfectCADRenderer({
       return;
     }
 
+    // Debug logging
+    console.log('Rendering floor plan:', {
+      walls: floorPlan.walls?.length,
+      bounds: floorPlan.bounds,
+      layers: layers,
+      scale: scale,
+      offset: offset
+    });
+
     // Calculate optimal scale and center the floor plan
     calculateOptimalView(rect);
 
@@ -99,7 +108,8 @@ export default function PixelPerfectCADRenderer({
     ctx.scale(scale, scale);
 
     // STEP 1: Render walls as black/gray lines (exact match to reference)
-    if (layers.walls && floorPlan.walls) {
+    if (layers.walls && floorPlan.walls && floorPlan.walls.length > 0) {
+      console.log('Rendering walls:', floorPlan.walls);
       renderWalls(ctx, floorPlan.walls);
     }
 
@@ -340,20 +350,46 @@ export default function PixelPerfectCADRenderer({
   };
 
   const calculateOptimalView = (rect: DOMRect) => {
-    if (!floorPlan) return;
+    if (!floorPlan || !floorPlan.bounds) return;
 
     const bounds = floorPlan.bounds;
     const planWidth = bounds.maxX - bounds.minX;
     const planHeight = bounds.maxY - bounds.minY;
 
-    if (planWidth === 0 || planHeight === 0) return;
+    console.log('Calculating view:', { bounds, planWidth, planHeight, rect: { width: rect.width, height: rect.height } });
+
+    // If bounds are invalid, try to calculate from walls
+    if (planWidth <= 0 || planHeight <= 0) {
+      if (floorPlan.walls && floorPlan.walls.length > 0) {
+        const wallBounds = calculateWallBounds(floorPlan.walls);
+        if (wallBounds) {
+          const wallWidth = wallBounds.maxX - wallBounds.minX;
+          const wallHeight = wallBounds.maxY - wallBounds.minY;
+          
+          if (wallWidth > 0 && wallHeight > 0) {
+            const padding = 100;
+            const scaleX = (rect.width - padding * 2) / wallWidth;
+            const scaleY = (rect.height - padding * 2) / wallHeight;
+            
+            const newScale = Math.min(scaleX, scaleY, 1);
+            setScale(newScale);
+            
+            setOffset({
+              x: (rect.width - wallWidth * newScale) / 2 - wallBounds.minX * newScale,
+              y: (rect.height - wallHeight * newScale) / 2 - wallBounds.minY * newScale
+            });
+          }
+        }
+      }
+      return;
+    }
 
     const padding = 50;
     const scaleX = (rect.width - padding * 2) / planWidth;
     const scaleY = (rect.height - padding * 2) / planHeight;
     
     if (scale === 1) { // Only auto-fit on initial load
-      const newScale = Math.min(scaleX, scaleY, 2); // Max zoom of 2x
+      const newScale = Math.min(scaleX, scaleY, 1); // Reasonable max zoom
       setScale(newScale);
       
       // Calculate offset using the new scale
@@ -362,6 +398,27 @@ export default function PixelPerfectCADRenderer({
         y: (rect.height - planHeight * newScale) / 2 - bounds.minY * newScale
       });
     }
+  };
+
+  const calculateWallBounds = (walls: Wall[]) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    walls.forEach(wall => {
+      if (wall.points && wall.points.length === 2) {
+        const [start, end] = wall.points;
+        if (start && end && 
+            typeof start.x === 'number' && typeof start.y === 'number' &&
+            typeof end.x === 'number' && typeof end.y === 'number') {
+          minX = Math.min(minX, start.x, end.x);
+          minY = Math.min(minY, start.y, end.y);
+          maxX = Math.max(maxX, start.x, end.x);
+          maxY = Math.max(maxY, start.y, end.y);
+        }
+      }
+    });
+    
+    if (minX === Infinity) return null;
+    return { minX, minY, maxX, maxY };
   };
 
   // Mouse interaction handlers for pan and zoom

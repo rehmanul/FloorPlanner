@@ -104,14 +104,14 @@ export default function IlotConfiguration({
   }, [floorPlan, settings, onIlotsGenerated, toast]);
 
   return (
-    <Card className="border-0 shadow-none relative z-20">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center">
-          <Settings className="w-4 h-4 mr-2" />
+    <Card className="border-0 shadow-none relative z-20 m-2 sm:m-4">
+      <CardHeader className="pb-2 px-3 sm:px-6">
+        <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 flex items-center">
+          <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
           Îlot Configuration
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6 relative z-20">
+      <CardContent className="space-y-3 sm:space-y-6 relative z-20 px-3 sm:px-6">
         {/* Density Control */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -230,7 +230,7 @@ export default function IlotConfiguration({
           type="button"
           onClick={handleGenerateLayout}
           disabled={!floorPlan || processing}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white relative z-10"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white relative z-50 text-xs sm:text-sm py-2 sm:py-3"
         >
           {processing ? (
             <div className="flex items-center">

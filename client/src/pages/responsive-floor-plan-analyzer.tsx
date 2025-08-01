@@ -133,33 +133,33 @@ export default function ResponsiveFloorPlanAnalyzer() {
   }, []);
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Responsive Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
-        <div className="px-4 py-3 lg:px-6 lg:py-4">
+      <header className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0 z-30">
+        <div className="px-3 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4">
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
-            <div className="flex items-center space-x-3 lg:space-x-4 min-w-0">
-              <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
-                <svg className="w-6 h-6 lg:w-8 lg:h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4 min-w-0 flex-1">
+              <div className="bg-blue-600 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h18v2H3v-2zm0 4h18v2H3v-2zm0 4h18v2H3v-2z"/>
                 </svg>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-bold text-gray-900 truncate">
                   CAD Floor Plan Analyzer
                 </h1>
-                <p className="text-xs lg:text-sm text-gray-600 hidden sm:block">
+                <p className="text-xs text-gray-600 hidden sm:block truncate">
                   Professional Edition - Real-time Processing
                 </p>
               </div>
             </div>
 
             {/* Header Actions */}
-            <div className="flex items-center space-x-2 lg:space-x-4">
+            <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-3 flex-shrink-0">
               {/* Status Display */}
               <div className="text-right hidden md:block">
-                <div className="text-sm font-mono text-gray-500">
+                <div className="text-xs sm:text-sm font-mono text-gray-500 truncate">
                   {appState.processing ? processingStage : "Ready"}
                 </div>
                 <div className="text-xs text-gray-400">DXF/DWG Processing</div>
@@ -170,13 +170,13 @@ export default function ResponsiveFloorPlanAnalyzer() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setAppState(prev => ({ ...prev, leftDrawerOpen: !prev.leftDrawerOpen }))}
-                className="lg:hidden h-8 w-8 p-0"
+                className="lg:hidden h-6 w-6 sm:h-8 sm:w-8 p-0"
               >
-                <Menu className="h-4 w-4" />
+                <Menu className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               
               {/* Export Button */}
-              <Button className="hidden lg:flex bg-blue-600 hover:bg-blue-700">
+              <Button className="hidden lg:flex bg-blue-600 hover:bg-blue-700 text-sm px-3 py-2">
                 Export Results
               </Button>
             </div>
@@ -185,7 +185,7 @@ export default function ResponsiveFloorPlanAnalyzer() {
       </header>
 
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative min-h-0">
         {/* Left Drawer Overlay for Mobile */}
         {appState.leftDrawerOpen && (
           <div 
@@ -196,29 +196,29 @@ export default function ResponsiveFloorPlanAnalyzer() {
 
         {/* Left Drawer */}
         <div className={`
-          bg-white border-r border-gray-200 shadow-lg transition-all duration-300 ease-in-out
+          bg-white border-r border-gray-200 shadow-lg transition-all duration-300 ease-in-out flex-shrink-0
           ${appState.leftDrawerOpen 
-            ? 'fixed lg:relative w-full sm:w-80 lg:w-80 z-50 lg:z-auto' 
-            : 'w-0 lg:w-0 overflow-hidden'
+            ? 'fixed lg:relative w-full sm:w-80 lg:w-80 xl:w-96 z-50 lg:z-auto' 
+            : 'w-0 overflow-hidden'
           }
           h-full
         `}>
-          <div className="w-full sm:w-80 lg:w-80 h-full flex flex-col bg-white">
+          <div className="w-full sm:w-80 lg:w-80 xl:w-96 h-full flex flex-col bg-white">
             {/* Drawer Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+            <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-sm font-semibold text-gray-700">Tools & Configuration</h3>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setAppState(prev => ({ ...prev, leftDrawerOpen: false }))}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 lg:hidden"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-0">
               <FileUpload
                 onFileProcessed={handleFileProcessed}
                 onProcessingUpdate={handleProcessingUpdate}
@@ -247,31 +247,31 @@ export default function ResponsiveFloorPlanAnalyzer() {
         </div>
 
         {/* Main Canvas Area */}
-        <div className="flex-1 flex flex-col bg-white relative overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white relative overflow-hidden min-w-0">
           {/* Desktop Drawer Toggle Buttons */}
-          <div className="absolute top-4 left-4 z-30 hidden lg:flex space-x-2">
+          <div className="absolute top-2 left-2 z-30 hidden lg:flex space-x-2">
             {!appState.leftDrawerOpen && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAppState(prev => ({ ...prev, leftDrawerOpen: true }))}
-                className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-blue-200 hover:border-blue-300"
+                className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border border-blue-200 hover:border-blue-300 text-xs"
               >
-                <Settings className="w-4 h-4 mr-2" />
+                <Settings className="w-3 h-3 mr-1" />
                 Tools
               </Button>
             )}
           </div>
           
-          <div className="absolute top-4 right-4 z-30 hidden lg:flex space-x-2">
+          <div className="absolute top-2 right-2 z-30 hidden lg:flex space-x-2">
             {!appState.rightDrawerOpen && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAppState(prev => ({ ...prev, rightDrawerOpen: true }))}
-                className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-green-200 hover:border-green-300"
+                className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border border-green-200 hover:border-green-300 text-xs"
               >
-                <BarChart3 className="w-4 h-4 mr-2" />
+                <BarChart3 className="w-3 h-3 mr-1" />
                 Analytics
               </Button>
             )}
@@ -300,29 +300,29 @@ export default function ResponsiveFloorPlanAnalyzer() {
 
         {/* Right Drawer */}
         <div className={`
-          bg-white border-l border-gray-200 shadow-lg transition-all duration-300 ease-in-out
+          bg-white border-l border-gray-200 shadow-lg transition-all duration-300 ease-in-out flex-shrink-0
           ${appState.rightDrawerOpen 
-            ? 'fixed lg:relative w-full sm:w-96 lg:w-96 z-50 lg:z-auto right-0' 
-            : 'w-0 lg:w-0 overflow-hidden'
+            ? 'fixed lg:relative w-full sm:w-80 lg:w-80 xl:w-96 z-50 lg:z-auto right-0' 
+            : 'w-0 overflow-hidden'
           }
           h-full
         `}>
-          <div className="w-full sm:w-96 lg:w-96 h-full flex flex-col bg-white">
+          <div className="w-full sm:w-80 lg:w-80 xl:w-96 h-full flex flex-col bg-white">
             {/* Drawer Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+            <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-sm font-semibold text-gray-700">Analytics & Insights</h3>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setAppState(prev => ({ ...prev, rightDrawerOpen: false }))}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 lg:hidden"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-0">
               <RealAnalyticsPanel
                 floorPlan={appState.floorPlan}
                 ilots={appState.ilots}
@@ -335,22 +335,22 @@ export default function ResponsiveFloorPlanAnalyzer() {
       </div>
 
       {/* Responsive Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-col space-y-3 z-30">
+      <div className="fixed bottom-4 right-4 flex flex-col space-y-2 z-30">
         {/* 3D Walkthrough */}
         <Button
           onClick={handle3DWalkthrough}
-          className="bg-purple-600 hover:bg-purple-700 p-3 rounded-full shadow-lg"
+          className="bg-purple-600 hover:bg-purple-700 p-2 sm:p-3 rounded-full shadow-lg"
           size="icon"
           title="3D Walkthrough"
           disabled={!appState.floorPlan || appState.ilots.length === 0}
         >
-          <Eye className="w-5 h-5 lg:w-6 lg:h-6" />
+          <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
         
         {/* Quick Analysis */}
         <Button
           onClick={handleQuickAnalysis}
-          className="bg-blue-600 hover:bg-blue-700 p-3 rounded-full shadow-lg"
+          className="bg-blue-600 hover:bg-blue-700 p-2 sm:p-3 rounded-full shadow-lg"
           size="icon"
           title="Quick Analysis"
         >

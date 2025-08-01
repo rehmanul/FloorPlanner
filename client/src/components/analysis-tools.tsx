@@ -16,19 +16,22 @@ export default function AnalysisTools({ selectedTool, onToolChange }: AnalysisTo
   ];
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-gray-700">Analysis Tools</CardTitle>
+    <Card className="border-0 shadow-none m-2 sm:m-4">
+      <CardHeader className="pb-2 px-3 sm:px-6">
+        <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 flex items-center">
+          <Ruler className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+          Analysis Tools
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-1 sm:space-y-2 px-3 sm:px-6">
         {tools.map((tool) => (
           <Button
             key={tool.id}
             variant={selectedTool === tool.id ? "default" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start text-xs sm:text-sm py-1 sm:py-2"
             onClick={() => onToolChange(tool.id)}
           >
-            <tool.icon className="w-4 h-4 mr-2" />
+            <tool.icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
             {tool.label}
           </Button>
         ))}

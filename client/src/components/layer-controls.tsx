@@ -29,11 +29,11 @@ export default function LayerControls({ layers, onLayerToggle }: LayerControlsPr
   const visibleLayers = Object.values(layers).filter(Boolean).length;
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+    <Card className="border-0 shadow-none m-2 sm:m-4">
+      <CardHeader className="pb-2 px-3 sm:px-6">
+        <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 flex items-center justify-between">
           <div className="flex items-center">
-            <Layers className="w-4 h-4 mr-2" />
+            <Layers className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
             Layer Controls
           </div>
           <Badge variant="secondary" className="text-xs">
@@ -41,7 +41,7 @@ export default function LayerControls({ layers, onLayerToggle }: LayerControlsPr
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 sm:space-y-3 px-3 sm:px-6">
         {layerConfig.map((layer) => (
           <div key={layer.key} className="flex items-center justify-between">
             <div className="flex items-center space-x-3">

@@ -125,18 +125,18 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
   }, []);
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center">
-          <FileText className="w-4 h-4 mr-2" />
+    <Card className="border-0 shadow-none m-2 sm:m-4">
+      <CardHeader className="pb-2 px-3 sm:px-6">
+        <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 flex items-center">
+          <FileText className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
           File Upload
         </CardTitle>
       </CardHeader>
-      <CardContent className="relative z-0">
+      <CardContent className="relative z-0 px-3 sm:px-6">
         {!processing ? (
           <label 
             htmlFor="file-upload-input"
-            className={`relative block border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+            className={`relative block border-2 border-dashed rounded-lg p-3 sm:p-6 text-center transition-colors cursor-pointer ${
               dragActive 
                 ? 'border-blue-400 bg-blue-50' 
                 : 'border-gray-300 hover:border-gray-400'
@@ -146,15 +146,15 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
             onDragOver={handleDrag}
             onDrop={handleDrop}
           >
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
+            <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-2 sm:mb-4" />
+            <div className="space-y-1 sm:space-y-2">
+              <p className="text-xs sm:text-sm font-medium text-gray-700">
                 Drop your CAD file here
               </p>
               <p className="text-xs text-gray-500">
                 or click to browse
               </p>
-              <div className="flex flex-wrap gap-1 justify-center mt-3">
+              <div className="flex flex-wrap gap-1 justify-center mt-2 sm:mt-3">
                 {['DXF', 'DWG', 'PDF', 'JPG', 'PNG'].map(format => (
                   <Badge key={format} variant="secondary" className="text-xs">
                     {format}
