@@ -568,34 +568,62 @@ export class AuthenticCADProcessor {
     const allPoints: Point[] = [];
 
     geometryData.forEach(geom => {
-      if (geom.start) allPoints.push(geom.start);
-      if (geom.end) allPoints.push(geom.end);
-      if (geom.vertices) allPoints.push(...geom.vertices);
+      if (geom.start && typeof geom.start.x === 'number' && typeof geom.start.y === 'number') {
+        allPoints.push(geom.start);
+      }
+      if (geom.end && typeof geom.end.x === 'number' && typeof geom.end.y === 'number') {
+        allPoints.push(geom.end);
+      }
+      if (geom.vertices && Array.isArray(geom.vertices)) {
+        geom.vertices.forEach(vertex => {
+          if (vertex && typeof vertex.x === 'number' && typeof vertex.y === 'number') {
+            allPoints.push(vertex);
+          }
+        });
+      }
     });
 
     if (allPoints.length === 0) {
       return { minX: 0, maxX: 10000, minY: 0, maxY: 8000 };
     }
 
+    const validPoints = allPoints.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+    
+    if (validPoints.length === 0) {
+      return { minX: 0, maxX: 10000, minY: 0, maxY: 8000 };
+    }
+
     return {
-      minX: Math.min(...allPoints.map(p => p.x)),
-      maxX: Math.max(...allPoints.map(p => p.x)),
-      minY: Math.min(...allPoints.map(p => p.y)),
-      maxY: Math.max(...allPoints.map(p => p.y))
+      minX: Math.min(...validPoints.map(p => p.x)),
+      maxX: Math.max(...validPoints.map(p => p.x)),
+      minY: Math.min(...validPoints.map(p => p.y)),
+      maxY: Math.max(...validPoints.map(p => p.y))
     };
   }
 
   private calculateSpaceAnalysis(walls: Wall[], restrictedAreas: RestrictedArea[], bounds: Rectangle) {
     const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) / 1000000; // Convert to m²
     const wallArea = walls.reduce((sum, wall) => {
+      if (!wall.points || wall.points.length < 2) return sum;
+      
+      const point1 = wall.points[0];
+      const point2 = wall.points[1];
+      
+      if (!point1 || !point2 || 
+          typeof point1.x !== 'number' || typeof point1.y !== 'number' ||
+          typeof point2.x !== 'number' || typeof point2.y !== 'number') {
+        return sum;
+      }
+      
       const length = Math.sqrt(
-        Math.pow(wall.points[1].x - wall.points[0].x, 2) + 
-        Math.pow(wall.points[1].y - wall.points[0].y, 2)
+        Math.pow(point2.x - point1.x, 2) + 
+        Math.pow(point2.y - point1.y, 2)
       );
       return sum + (length * (wall.thickness || 150)) / 1000000;
     }, 0);
 
     const restrictedArea = restrictedAreas.reduce((sum, area) => {
+      if (!area.bounds) return sum;
       const areaBounds = area.bounds;
       return sum + ((areaBounds.maxX - areaBounds.minX) * (areaBounds.maxY - areaBounds.minY)) / 1000000;
     }, 0);
@@ -605,7 +633,7 @@ export class AuthenticCADProcessor {
       usableArea: totalArea - wallArea - restrictedArea,
       wallArea,
       restrictedArea,
-      efficiency: ((totalArea - wallArea - restrictedArea) / totalArea) * 100
+      efficiency: totalArea > 0 ? ((totalArea - wallArea - restrictedArea) / totalArea) * 100 : 0
     };
   }
 
