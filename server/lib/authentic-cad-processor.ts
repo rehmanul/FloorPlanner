@@ -154,7 +154,10 @@ export class AuthenticCADProcessor {
       const bounds = this.calculateFloorPlanBounds(rawGeometricData);
       
       this.updateProgress(80, 'Calculating space analysis metrics...');
-      const spaceAnalysis = this.calculateSpaceAnalysis(walls, restrictedAreas, bounds);
+      const spaceAnalysis = {
+        ...this.calculateSpaceAnalysis(walls, restrictedAreas, bounds),
+        bounds
+      };
       
       this.updateProgress(95, 'Finalizing authentic CAD processing...');
       
@@ -206,8 +209,8 @@ export class AuthenticCADProcessor {
           points: [geom.start, geom.end],
           thickness: geom.thickness || 150,
           layer: geom.layer,
-          color: '#000000', // BLACK LINES as specified
-          type: 'structural'
+          color: '#6B7280', // Gray walls matching reference image
+          type: 'wall' as const
         });
       } else if (geom.type === 'POLYLINE' && geom.vertices?.length > 1) {
         for (let i = 0; i < geom.vertices.length - 1; i++) {
@@ -216,8 +219,8 @@ export class AuthenticCADProcessor {
             points: [geom.vertices[i], geom.vertices[i + 1]],
             thickness: geom.thickness || 150,
             layer: geom.layer,
-            color: '#000000', // BLACK LINES
-            type: 'structural'
+            color: '#6B7280', // Gray walls matching reference
+            type: 'wall' as const
           });
         }
       }
@@ -237,7 +240,7 @@ export class AuthenticCADProcessor {
       if (this.isRestrictedAreaPattern(geom)) {
         restrictedAreas.push({
           id: `restricted_${index}`,
-          type: this.determineRestrictedType(geom),
+          type: 'restricted' as const,
           bounds: this.getGeometryBounds(geom),
           color: '#3B82F6', // LIGHT BLUE as specified
           restrictions: ['no-ilot-placement', 'emergency-access']
@@ -266,7 +269,7 @@ export class AuthenticCADProcessor {
           isEntrance,
           swingDirection: this.getDoorSwing(geom),
           color: isEntrance ? '#EF4444' : '#92400E', // RED for entrances
-          type: isEntrance ? 'entrance' : 'interior'
+          type: 'door' as const
         });
       }
     });
@@ -287,7 +290,7 @@ export class AuthenticCADProcessor {
           position: this.getWindowPosition(geom),
           width: this.getWindowWidth(geom),
           height: this.getWindowHeight(geom),
-          type: 'standard'
+          type: 'window' as const
         });
       }
     });
@@ -388,7 +391,7 @@ export class AuthenticCADProcessor {
     return length < 1500; // Less than 1.5m typically indicates door opening
   }
 
-  private getGeometryBounds(geom: any): FloorPlanBounds {
+  private getGeometryBounds(geom: any): Rectangle {
     if (geom.vertices?.length > 0) {
       const xs = geom.vertices.map((v: Point) => v.x);
       const ys = geom.vertices.map((v: Point) => v.y);
@@ -459,7 +462,7 @@ export class AuthenticCADProcessor {
     return geom.height || 1200; // Default 1.2m window height
   }
 
-  private calculateFloorPlanBounds(geometryData: any[]): FloorPlanBounds {
+  private calculateFloorPlanBounds(geometryData: any[]): Rectangle {
     const allPoints: Point[] = [];
     
     geometryData.forEach(geom => {
@@ -480,7 +483,7 @@ export class AuthenticCADProcessor {
     };
   }
 
-  private calculateSpaceAnalysis(walls: Wall[], restrictedAreas: RestrictedArea[], bounds: FloorPlanBounds) {
+  private calculateSpaceAnalysis(walls: Wall[], restrictedAreas: RestrictedArea[], bounds: Rectangle) {
     const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) / 1000000; // Convert to m²
     const wallArea = walls.reduce((sum, wall) => {
       const length = Math.sqrt(

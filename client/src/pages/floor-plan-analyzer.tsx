@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Upload, Zap, Save, Eye, Menu, Settings, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import FileUpload from "@/components/file-upload";
-import CADCanvas from "@/components/cad-canvas";
+import PixelPerfectCADRenderer from "@/components/pixel-perfect-cad-renderer";
 import AnalysisTools from "@/components/analysis-tools";
 import IlotConfiguration from "@/components/ilot-configuration";
 import RealAnalyticsPanel from "@/components/real-analytics-panel";
@@ -42,7 +42,7 @@ interface AppState {
 
 export default function FloorPlanAnalyzer() {
   const { toast } = useToast();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Remove old canvas ref - now using pixel-perfect renderer
   
   const [appState, setAppState] = useState<AppState>({
     currentFile: null,
@@ -309,8 +309,7 @@ export default function FloorPlanAnalyzer() {
           
           {/* Remove keyboard shortcuts hint as requested */}
           
-          <CADCanvas
-            ref={canvasRef}
+          <PixelPerfectCADRenderer
             floorPlan={appState.floorPlan}
             ilots={appState.ilots}
             corridors={appState.corridors}
