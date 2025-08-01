@@ -47,87 +47,45 @@ export default function IlotConfiguration({
     }
 
     try {
-      // Simulate layout generation
-      const numIlots = Math.floor((480 * settings.density) / 100 / 20); // Rough calculation
-      const ilots: Ilot[] = [];
-      const corridors: Corridor[] = [];
+      // Use real îlot placement engine
+      const { RealIlotPlacementEngine } = await import('../lib/real-ilot-placement');
+      const placementSettings = {
+        density: settings.density,
+        corridorWidth: settings.corridorWidth,
+        minClearance: settings.minClearance,
+        algorithm: settings.algorithm as 'intelligent' | 'grid' | 'genetic' | 'simulated_annealing'
+      };
+      
+      const engine = new RealIlotPlacementEngine(floorPlan, placementSettings);
+      const { ilots, corridors } = engine.generateLayout();
 
-      // Generate îlots in a grid pattern
-      const gridCols = Math.ceil(Math.sqrt(numIlots));
-      const gridRows = Math.ceil(numIlots / gridCols);
-      const spacingX = 700 / (gridCols + 1);
-      const spacingY = 500 / (gridRows + 1);
-
-      for (let i = 0; i < numIlots; i++) {
-        const col = i % gridCols;
-        const row = Math.floor(i / gridCols);
-        
-        ilots.push({
-          id: `ilot_${i + 1}`,
-          x: 50 + spacingX * (col + 1),
-          y: 50 + spacingY * (row + 1),
-          width: 160,
-          height: 120,
-          rotation: 0,
-          type: 'workstation',
-          capacity: 4
-        });
-      }
-
-      // Generate corridors
-      for (let row = 0; row < gridRows; row++) {
-        corridors.push({
-          id: `corridor_h_${row}`,
-          x: 400,
-          y: 50 + spacingY * (row + 1),
-          width: settings.corridorWidth,
-          length: 700,
-          direction: 'horizontal' as const
-        });
-      }
-
-      for (let col = 0; col < gridCols; col++) {
-        corridors.push({
-          id: `corridor_v_${col}`,
-          x: 50 + spacingX * (col + 1),
-          y: 300,
-          width: settings.corridorWidth,
-          length: 500,
-          direction: 'vertical' as const
-        });
-      }
-
-      // Generate analytics
+      // Calculate real analytics based on actual placement
+      const totalIlotArea = ilots.reduce((sum, ilot) => sum + ilot.area, 0);
+      const corridorLength = corridors.reduce((sum, corridor) => 
+        sum + Math.sqrt(Math.pow(corridor.x2 - corridor.x1, 2) + Math.pow(corridor.y2 - corridor.y1, 2)) / 1000, 0
+      ); // Convert mm to meters
+      
       const analytics: LayoutAnalytics = {
-        totalArea: 480000, // 480 m²
-        usedArea: ilots.length * 1.92, // 1.92 m² per îlot
-        utilizationRate: (ilots.length * 1.92 / 480) * 100,
         totalIlots: ilots.length,
-        averageIlotSize: 1.92,
-        corridorCoverage: (corridors.length * settings.corridorWidth * 200 / 480000) * 100,
-        accessibilityScore: 95,
-        distribution: {
-          small: Math.floor(ilots.length * 0.2),
-          medium: Math.floor(ilots.length * 0.5),
-          large: Math.floor(ilots.length * 0.2),
-          xlarge: Math.floor(ilots.length * 0.1)
-        },
-        densityProfile: settings.density,
-        algorithm: settings.algorithm
+        totalArea: totalIlotArea,
+        avgIlotSize: ilots.length > 0 ? totalIlotArea / ilots.length : 0,
+        corridorLength,
+        spaceEfficiency: (totalIlotArea / (floorPlan.spaceAnalysis.usableArea || 1)) * 100,
+        densityAchieved: (ilots.length / (floorPlan.spaceAnalysis.usableArea || 1)) * 100
       };
 
       onIlotsGenerated(ilots, corridors, analytics);
       
       toast({
         title: "Layout Generated",
-        description: `Successfully generated ${ilots.length} îlots with optimized corridor network.`
+        description: `Successfully generated ${ilots.length} îlots using ${settings.algorithm} algorithm with ${corridors.length} corridors.`
       });
 
     } catch (error) {
       console.error("Layout generation error:", error);
       toast({
         title: "Generation Failed",
-        description: "An error occurred while generating the layout.",
+        description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     }
@@ -142,48 +100,93 @@ export default function IlotConfiguration({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Density Settings */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-medium text-gray-600">Density Profile</label>
+        {/* Density Control */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Density</label>
             <Badge variant="outline" className="text-xs">
-              {settings.density}%
+              {settings.density} îlots/100m²
             </Badge>
           </div>
           <Slider
             value={[settings.density]}
-            onValueChange={([value]) => onSettingsChange({ density: value })}
-            min={10}
-            max={35}
-            step={5}
+            onValueChange={(value) => onSettingsChange({ density: value[0] })}
+            max={25}
+            min={5}
+            step={1}
             className="w-full"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>10%</span>
-            <span>25%</span>
-            <span>35%</span>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>Low density</span>
+            <span>High density</span>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Corridor Width */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Corridor Width</label>
+            <Badge variant="outline" className="text-xs">
+              {settings.corridorWidth}mm
+            </Badge>
+          </div>
+          <Slider
+            value={[settings.corridorWidth]}
+            onValueChange={(value) => onSettingsChange({ corridorWidth: value[0] })}
+            max={2000}
+            min={800}
+            step={100}
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>800mm</span>
+            <span>2000mm</span>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Minimum Clearance */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Min Clearance</label>
+            <Badge variant="outline" className="text-xs">
+              {settings.minClearance}mm
+            </Badge>
+          </div>
+          <Slider
+            value={[settings.minClearance]}
+            onValueChange={(value) => onSettingsChange({ minClearance: value[0] })}
+            max={1000}
+            min={200}
+            step={50}
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>200mm</span>
+            <span>1000mm</span>
           </div>
         </div>
 
         <Separator />
 
         {/* Algorithm Selection */}
-        <div>
-          <label className="text-xs font-medium text-gray-600 mb-2 block">
-            Placement Algorithm
-          </label>
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-gray-700">Placement Algorithm</label>
           <Select
             value={settings.algorithm}
             onValueChange={(value) => onSettingsChange({ algorithm: value })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="intelligent">
                 <div className="flex items-center">
                   <Brain className="w-4 h-4 mr-2" />
-                  Intelligent
+                  Intelligent Placement
                 </div>
               </SelectItem>
               <SelectItem value="grid">
@@ -198,44 +201,14 @@ export default function IlotConfiguration({
                   Genetic Algorithm
                 </div>
               </SelectItem>
+              <SelectItem value="simulated_annealing">
+                <div className="flex items-center">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Simulated Annealing
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        {/* Corridor Settings */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-medium text-gray-600">Corridor Width</label>
-            <Badge variant="outline" className="text-xs">
-              {settings.corridorWidth}cm
-            </Badge>
-          </div>
-          <Slider
-            value={[settings.corridorWidth]}
-            onValueChange={([value]) => onSettingsChange({ corridorWidth: value })}
-            min={80}
-            max={200}
-            step={10}
-            className="w-full"
-          />
-        </div>
-
-        {/* Clearance Settings */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-medium text-gray-600">Min Clearance</label>
-            <Badge variant="outline" className="text-xs">
-              {settings.minClearance}cm
-            </Badge>
-          </div>
-          <Slider
-            value={[settings.minClearance]}
-            onValueChange={([value]) => onSettingsChange({ minClearance: value })}
-            min={50}
-            max={150}
-            step={10}
-            className="w-full"
-          />
         </div>
 
         <Separator />
@@ -244,20 +217,34 @@ export default function IlotConfiguration({
         <Button
           onClick={handleGenerateLayout}
           disabled={!floorPlan || processing}
-          className="w-full bg-blue-600 hover:bg-blue-700"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
         >
           {processing ? (
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Generating...
+              Generating Layout...
             </div>
           ) : (
-            <div className="flex items-center">
-              <Zap className="w-4 h-4 mr-2" />
-              Generate Layout
-            </div>
+            'Generate Îlot Layout'
           )}
         </Button>
+
+        {/* Algorithm Info */}
+        <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg">
+          <div className="font-medium mb-1">Algorithm Details:</div>
+          {settings.algorithm === 'intelligent' && 
+            "Uses space analysis and collision detection for optimal placement with varied îlot sizes."
+          }
+          {settings.algorithm === 'grid' && 
+            "Places îlots in a regular grid pattern with consistent spacing."
+          }
+          {settings.algorithm === 'genetic' && 
+            "Evolves layouts through multiple generations to find optimal arrangements."
+          }
+          {settings.algorithm === 'simulated_annealing' && 
+            "Uses thermodynamic simulation to escape local optimization minima."
+          }
+        </div>
       </CardContent>
     </Card>
   );

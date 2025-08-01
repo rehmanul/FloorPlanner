@@ -57,60 +57,35 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
     onProcessingUpdate("Initializing file processor...", 0);
 
     try {
-      // Simulate processing stages
-      const stages = [
-        { name: "Reading file structure...", duration: 1000 },
-        { name: "Parsing geometric elements...", duration: 2000 },
-        { name: "Extracting wall boundaries...", duration: 1500 },
-        { name: "Identifying restricted areas...", duration: 1000 },
-        { name: "Processing entrance points...", duration: 800 },
-        { name: "Finalizing floor plan data...", duration: 700 }
-      ];
+      // Real file processing using server API
+      onProcessingUpdate("Uploading file to server...", 10);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', file.name);
 
-      let progress = 0;
-      for (let i = 0; i < stages.length; i++) {
-        const stage = stages[i];
-        onProcessingUpdate(stage.name, progress);
-        await new Promise(resolve => setTimeout(resolve, stage.duration));
-        progress = ((i + 1) / stages.length) * 100;
+      const response = await fetch('/api/floor-plans', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Server processing failed');
       }
 
-      // Create mock processed floor plan for demo
-      const processedFloorPlan: ProcessedFloorPlan = {
-        walls: [
-          { id: 'wall1', type: 'wall', points: [{ x: 0, y: 0 }, { x: 800, y: 0 }], thickness: 20 },
-          { id: 'wall2', type: 'wall', points: [{ x: 800, y: 0 }, { x: 800, y: 600 }], thickness: 20 },
-          { id: 'wall3', type: 'wall', points: [{ x: 800, y: 600 }, { x: 0, y: 600 }], thickness: 20 },
-          { id: 'wall4', type: 'wall', points: [{ x: 0, y: 600 }, { x: 0, y: 0 }], thickness: 20 },
-          { id: 'wall5', type: 'wall', points: [{ x: 300, y: 0 }, { x: 300, y: 200 }], thickness: 15 },
-          { id: 'wall6', type: 'wall', points: [{ x: 500, y: 200 }, { x: 800, y: 200 }], thickness: 15 }
-        ],
-        doors: [
-          { id: 'door1', type: 'door', center: { x: 400, y: 0 }, radius: 80 }
-        ],
-        windows: [
-          { id: 'window1', type: 'window', bounds: { x: 600, y: 0, width: 120, height: 20 } }
-        ],
-        restrictedAreas: [
-          { id: 'restrict1', type: 'restricted', bounds: { x: 100, y: 100, width: 80, height: 80 } },
-          { id: 'restrict2', type: 'restricted', bounds: { x: 700, y: 500, width: 60, height: 60 } }
-        ],
-        spaceAnalysis: {
-          totalArea: 480,
-          usableArea: 450,
-          wallArea: 30,
-          efficiency: 93.75,
-          bounds: { minX: 0, minY: 0, maxX: 800, maxY: 600 }
-        },
-        bounds: { minX: 0, minY: 0, maxX: 800, maxY: 600 }
-      };
+      onProcessingUpdate("Server processing complete...", 90);
+      const result = await response.json();
+      
+      // Extract geometry data from server response
+      const processedFloorPlan: ProcessedFloorPlan = result.geometryData;
 
       onProcessingUpdate("Processing complete!", 100);
       setTimeout(() => {
         onFileProcessed(processedFloorPlan);
         toast({
           title: "File Processed Successfully",
-          description: `${file.name} has been analyzed and is ready for îlot placement.`
+          description: `${file.name} has been analyzed and ${processedFloorPlan.walls.length} walls, ${processedFloorPlan.doors.length} doors, and ${processedFloorPlan.windows.length} windows detected.`
         });
       }, 500);
 

@@ -45,18 +45,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const floorPlan = await storage.createFloorPlan(floorPlanData);
 
-      // Process the file based on type
-      let processedData;
-      if (fileType === '.dxf' || fileType === '.dwg') {
-        const { DXFProcessor } = await import('./lib/dxf-processor');
-        const processor = new DXFProcessor();
-        processedData = await processor.processDXF(fileContent);
-      } else if (fileType === '.pdf') {
-        // TODO: Implement PDF processing
-        throw new Error('PDF processing not yet implemented');
-      } else {
-        throw new Error(`Unsupported file type: ${fileType}`);
-      }
+      // Process the file based on type using real CAD processor
+      const { RealCADProcessor } = await import('./lib/real-cad-processor');
+      const processor = new RealCADProcessor();
+      const processedData = await processor.processFile(req.file.buffer, req.file.originalname);
+
 
       // Update floor plan with processed data
       const updatedFloorPlan = await storage.updateFloorPlanStatus(

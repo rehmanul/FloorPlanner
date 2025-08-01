@@ -178,17 +178,11 @@ export interface Bounds {
 }
 
 export interface LayoutAnalytics {
-  ilotCount: number;
-  totalIlotArea: number;
+  totalIlots: number;
+  totalArea: number;
+  avgIlotSize: number;
   corridorLength: number;
-  averageIlotSize: number;
-  accessibilityScore: number;
-  fireCompliance: number;
-  efficiency: number;
-  distribution: {
-    small: number;
-    medium: number;
-    large: number;
-    xlarge: number;
-  };
+  spaceEfficiency: number;
+  densityAchieved: number;
+  algorithm?: string;
 }

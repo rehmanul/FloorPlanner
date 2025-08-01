@@ -7,7 +7,7 @@ import FileUpload from "@/components/file-upload";
 import CADCanvas from "@/components/cad-canvas";
 import AnalysisTools from "@/components/analysis-tools";
 import IlotConfiguration from "@/components/ilot-configuration";
-import AnalyticsPanel from "@/components/analytics-panel";
+import RealAnalyticsPanel from "@/components/real-analytics-panel";
 import LayerControls from "@/components/layer-controls";
 import Walkthrough3D from "@/components/walkthrough-3d";
 import { ProcessedFloorPlan, Ilot, Corridor, LayoutAnalytics } from "@shared/schema";
@@ -182,35 +182,7 @@ export default function FloorPlanAnalyzer() {
     setAppState(prev => ({ ...prev, rightDrawerOpen: !prev.rightDrawerOpen }));
   }, []);
 
-  // Keyboard shortcuts for drawer control
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey) {
-        switch (event.code) {
-          case 'Digit1':
-            event.preventDefault();
-            toggleLeftDrawer();
-            break;
-          case 'Digit2':
-            event.preventDefault();
-            toggleRightDrawer();
-            break;
-          case 'KeyF':
-            event.preventDefault();
-            // Toggle full-screen mode (collapse both drawers)
-            setAppState(prev => ({
-              ...prev,
-              leftDrawerOpen: false,
-              rightDrawerOpen: false
-            }));
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleLeftDrawer, toggleRightDrawer]);
+  // Removed keyboard shortcuts as requested
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -327,16 +299,7 @@ export default function FloorPlanAnalyzer() {
             )}
           </div>
           
-          {/* Keyboard Shortcuts Hint */}
-          <div className="absolute bottom-4 right-4 z-30">
-            <div className="bg-black/70 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm">
-              <div className="space-y-1">
-                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+1</kbd> Tools</div>
-                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+2</kbd> Analytics</div>
-                <div><kbd className="bg-white/20 px-1 rounded">Ctrl+F</kbd> Full Screen</div>
-              </div>
-            </div>
-          </div>
+          {/* Remove keyboard shortcuts hint as requested */}
           
           <CADCanvas
             ref={canvasRef}
@@ -372,13 +335,11 @@ export default function FloorPlanAnalyzer() {
             </div>
             
             <div className="flex-1 overflow-y-auto">
-              <AnalyticsPanel
+              <RealAnalyticsPanel
                 floorPlan={appState.floorPlan}
-                analytics={appState.analytics}
                 ilots={appState.ilots}
                 corridors={appState.corridors}
-                settings={appState.settings}
-                onSettingsChange={handleSettingsChange}
+                analytics={appState.analytics}
               />
             </div>
           </div>
