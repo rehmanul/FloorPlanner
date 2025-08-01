@@ -893,3 +893,25 @@ class AuthenticCADProcessor {
   }
 
   private calculateSpaceMetrics(walls: Wall[], bounds: Rectangle): any {
+    const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) / 1000000; // Convert to m²
+    
+    let wallArea = 0;
+    walls.forEach(wall => {
+      if (wall.points && wall.points.length >= 2) {
+        const length = this.calculateDistance(wall.points[0], wall.points[wall.points.length - 1]);
+        wallArea += (length * (wall.thickness || 150)) / 1000000;
+      }
+    });
+    
+    const usableArea = Math.max(0, totalArea - wallArea);
+    const efficiency = totalArea > 0 ? (usableArea / totalArea) * 100 : 0;
+    
+    return {
+      totalArea,
+      usableArea,
+      wallArea,
+      efficiency,
+      bounds
+    };
+  }
+}
