@@ -353,11 +353,13 @@ export default function PixelPerfectCADRenderer({
     const scaleY = (rect.height - padding * 2) / planHeight;
     
     if (scale === 1) { // Only auto-fit on initial load
-      setScale(Math.min(scaleX, scaleY, 2)); // Max zoom of 2x
+      const newScale = Math.min(scaleX, scaleY, 2); // Max zoom of 2x
+      setScale(newScale);
       
+      // Calculate offset using the new scale
       setOffset({
-        x: (rect.width - planWidth * scale) / 2 - bounds.minX * scale,
-        y: (rect.height - planHeight * scale) / 2 - bounds.minY * scale
+        x: (rect.width - planWidth * newScale) / 2 - bounds.minX * newScale,
+        y: (rect.height - planHeight * newScale) / 2 - bounds.minY * newScale
       });
     }
   };

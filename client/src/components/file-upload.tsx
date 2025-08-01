@@ -78,14 +78,22 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
       const result = await response.json();
       
       // Extract geometry data from server response
-      const processedFloorPlan: ProcessedFloorPlan = result.geometryData;
+      // The server returns the full floor plan with geometryData containing the ProcessedFloorPlan
+      const processedFloorPlan: ProcessedFloorPlan = result.geometryData || {
+        walls: result.walls || [],
+        doors: result.doors || [],
+        windows: result.windows || [],
+        restrictedAreas: result.restrictedAreas || [],
+        spaceAnalysis: result.spaceAnalysis || { totalArea: 0, usableArea: 0, wallArea: 0, efficiency: 0, bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } },
+        bounds: result.bounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+      };
 
       onProcessingUpdate("Processing complete!", 100);
       setTimeout(() => {
         onFileProcessed(processedFloorPlan);
         toast({
           title: "File Processed Successfully",
-          description: `${file.name} has been analyzed and ${processedFloorPlan.walls.length} walls, ${processedFloorPlan.doors.length} doors, and ${processedFloorPlan.windows.length} windows detected.`
+          description: `${file.name} has been analyzed and ${processedFloorPlan.walls?.length || 0} walls, ${processedFloorPlan.doors?.length || 0} doors, and ${processedFloorPlan.windows?.length || 0} windows detected.`
         });
       }, 500);
 

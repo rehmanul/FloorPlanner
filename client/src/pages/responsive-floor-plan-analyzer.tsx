@@ -81,7 +81,8 @@ export default function ResponsiveFloorPlanAnalyzer() {
     setAppState(prev => ({
       ...prev,
       floorPlan,
-      processing: false
+      processing: false,
+      leftDrawerOpen: false // Auto-close drawer after processing
     }));
     
     toast.success(`CAD File Processed Successfully - Floor plan loaded with ${floorPlan.walls?.length || 0} walls and ${floorPlan.restrictedAreas?.length || 0} restricted areas`);
