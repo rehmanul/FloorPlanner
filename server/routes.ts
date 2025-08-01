@@ -46,7 +46,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const floorPlan = await storage.createFloorPlan(floorPlanData);
 
       // Process the file using authentic CAD processor with pixel-perfect rendering
-      const { AuthenticCADProcessor } = await import('./lib/authentic-cad-processor');
+      const AuthenticCADProcessorModule = await import('./lib/authentic-cad-processor');
+      const AuthenticCADProcessor = AuthenticCADProcessorModule.default || AuthenticCADProcessorModule.AuthenticCADProcessor;
       const processor = new AuthenticCADProcessor();
       const fileExtension = '.' + req.file.originalname.split('.').pop()?.toLowerCase();
       const processedData = await processor.processCADFile(

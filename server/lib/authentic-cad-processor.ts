@@ -915,3 +915,6 @@ class AuthenticCADProcessor {
     };
   }
 }
+
+export { AuthenticCADProcessor };
+export default AuthenticCADProcessor;
