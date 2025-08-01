@@ -9,7 +9,7 @@ import AnalysisTools from "@/components/analysis-tools";
 import IlotConfiguration from "@/components/ilot-configuration";
 import RealAnalyticsPanel from "@/components/real-analytics-panel";
 import LayerControls from "@/components/layer-controls";
-import Walkthrough3D from "@/components/walkthrough-3d";
+import Advanced3DWalkthrough from "@/components/advanced-3d-walkthrough";
 import { ProcessedFloorPlan, Ilot, Corridor, LayoutAnalytics } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -268,15 +268,19 @@ export default function FloorPlanAnalyzer() {
 
         {/* Main Canvas Area */}
         <div className="flex-1 flex flex-col bg-white relative">
-          {/* Drawer Toggle Buttons */}
-          <div className="absolute top-4 left-4 z-30 flex space-x-2">
+          {/* Drawer Toggle Buttons with proper event handling */}
+          <div className="absolute top-4 left-4 z-30 flex space-x-2 pointer-events-auto">
             {!appState.leftDrawerOpen && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={toggleLeftDrawer}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  toggleLeftDrawer();
+                }}
                 className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-blue-200 hover:border-blue-300"
-                title="Open Tools Panel (Ctrl+1)"
+                title="Open Tools Panel"
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Tools
@@ -284,14 +288,18 @@ export default function FloorPlanAnalyzer() {
             )}
           </div>
           
-          <div className="absolute top-4 right-4 z-30 flex space-x-2">
+          <div className="absolute top-4 right-4 z-30 flex space-x-2 pointer-events-auto">
             {!appState.rightDrawerOpen && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={toggleRightDrawer}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  toggleRightDrawer();
+                }}
                 className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-2 border-green-200 hover:border-green-300"
-                title="Open Analytics Panel (Ctrl+2)"
+                title="Open Analytics Panel"
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Analytics
@@ -376,16 +384,14 @@ export default function FloorPlanAnalyzer() {
       </div>
 
       {/* 3D Walkthrough Modal */}
-      {appState.show3DWalkthrough && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <Walkthrough3D
-            floorPlan={appState.floorPlan}
-            ilots={appState.ilots}
-            walls={appState.floorPlan?.walls || []}
-            corridors={appState.corridors}
-            onClose={handle3DWalkthroughClose}
-          />
-        </div>
+      {appState.show3DWalkthrough && appState.floorPlan && (
+        <Advanced3DWalkthrough
+          floorPlan={appState.floorPlan}
+          ilots={appState.ilots}
+          walls={appState.floorPlan.walls}
+          corridors={appState.corridors}
+          onClose={() => setAppState(prev => ({ ...prev, show3DWalkthrough: false }))}
+        />
       )}
     </div>
   );
