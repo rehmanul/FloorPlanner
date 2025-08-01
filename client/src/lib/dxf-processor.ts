@@ -591,7 +591,7 @@ export class DXFProcessor {
     
     walls.forEach((wall, i) => {
       const wallLength = this.calculateWallLength(wall);
-      const wallVolume = wallLength * wall.thickness;
+      let wallVolume = wallLength * wall.thickness;
       
       // Subtract intersections with other walls
       walls.forEach((otherWall, j) => {

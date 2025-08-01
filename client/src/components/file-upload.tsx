@@ -14,7 +14,7 @@ interface FileUploadProps {
   processing: boolean;
 }
 
-export default function FileUpload({ onFileProcessed, onProcessingUpdate, processing }: FileUploadProps) {
+export default function FileUpload({ onFileProcessed, onProcessingUpdate, processing }: FileUploadProps): JSX.Element {
   const { toast } = useToast();
   const [dragActive, setDragActive] = useState(false);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -77,66 +77,32 @@ export default function FileUpload({ onFileProcessed, onProcessingUpdate, proces
 
       // Create mock processed floor plan for demo
       const processedFloorPlan: ProcessedFloorPlan = {
-        id: `plan_${Date.now()}`,
-        name: file.name,
-        originalName: file.name,
-        fileSize: file.size,
-        fileType: extension || 'unknown',
-        processed: {
-          walls: [
-            { start: { x: 0, y: 0 }, end: { x: 800, y: 0 }, thickness: 20, isExterior: true },
-            { start: { x: 800, y: 0 }, end: { x: 800, y: 600 }, thickness: 20, isExterior: true },
-            { start: { x: 800, y: 600 }, end: { x: 0, y: 600 }, thickness: 20, isExterior: true },
-            { start: { x: 0, y: 600 }, end: { x: 0, y: 0 }, thickness: 20, isExterior: true },
-            { start: { x: 300, y: 0 }, end: { x: 300, y: 200 }, thickness: 15, isExterior: false },
-            { start: { x: 500, y: 200 }, end: { x: 800, y: 200 }, thickness: 15, isExterior: false }
-          ],
-          areas: [
-            {
-              points: [
-                { x: 0, y: 0 },
-                { x: 800, y: 0 },
-                { x: 800, y: 600 },
-                { x: 0, y: 600 }
-              ],
-              type: 'floor',
-              area: 480000 // 480 m²
-            }
-          ],
-          restricted: [
-            { 
-              bounds: { x: 100, y: 100, width: 80, height: 80 },
-              type: 'column',
-              description: 'Structural column'
-            },
-            {
-              bounds: { x: 700, y: 500, width: 60, height: 60 },
-              type: 'hvac',
-              description: 'HVAC unit'
-            }
-          ],
-          entrances: [
-            { 
-              position: { x: 150, y: 0 },
-              width: 80,
-              type: 'main',
-              description: 'Main entrance'
-            },
-            {
-              position: { x: 800, y: 300 },
-              width: 80,
-              type: 'emergency',
-              description: 'Emergency exit'
-            }
-          ],
-          dimensions: {
-            width: 800,
-            height: 600,
-            units: 'cm'
-          }
+        walls: [
+          { id: 'wall1', type: 'wall', points: [{ x: 0, y: 0 }, { x: 800, y: 0 }], thickness: 20 },
+          { id: 'wall2', type: 'wall', points: [{ x: 800, y: 0 }, { x: 800, y: 600 }], thickness: 20 },
+          { id: 'wall3', type: 'wall', points: [{ x: 800, y: 600 }, { x: 0, y: 600 }], thickness: 20 },
+          { id: 'wall4', type: 'wall', points: [{ x: 0, y: 600 }, { x: 0, y: 0 }], thickness: 20 },
+          { id: 'wall5', type: 'wall', points: [{ x: 300, y: 0 }, { x: 300, y: 200 }], thickness: 15 },
+          { id: 'wall6', type: 'wall', points: [{ x: 500, y: 200 }, { x: 800, y: 200 }], thickness: 15 }
+        ],
+        doors: [
+          { id: 'door1', type: 'door', center: { x: 400, y: 0 }, radius: 80 }
+        ],
+        windows: [
+          { id: 'window1', type: 'window', bounds: { x: 600, y: 0, width: 120, height: 20 } }
+        ],
+        restrictedAreas: [
+          { id: 'restrict1', type: 'restricted', bounds: { x: 100, y: 100, width: 80, height: 80 } },
+          { id: 'restrict2', type: 'restricted', bounds: { x: 700, y: 500, width: 60, height: 60 } }
+        ],
+        spaceAnalysis: {
+          totalArea: 480,
+          usableArea: 450,
+          wallArea: 30,
+          efficiency: 93.75,
+          bounds: { minX: 0, minY: 0, maxX: 800, maxY: 600 }
         },
-        createdAt: new Date(),
-        updatedAt: new Date()
+        bounds: { minX: 0, minY: 0, maxX: 800, maxY: 600 }
       };
 
       onProcessingUpdate("Processing complete!", 100);

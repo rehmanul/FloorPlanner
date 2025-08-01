@@ -48,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process the file based on type
       let processedData;
       if (fileType === '.dxf' || fileType === '.dwg') {
-        const { DXFProcessor } = await import('../lib/dxf-processor');
+        const { DXFProcessor } = await import('./lib/dxf-processor');
         const processor = new DXFProcessor();
         processedData = await processor.processDXF(fileContent);
       } else if (fileType === '.pdf') {

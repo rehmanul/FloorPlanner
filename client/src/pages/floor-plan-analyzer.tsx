@@ -375,6 +375,8 @@ export default function FloorPlanAnalyzer() {
               <AnalyticsPanel
                 floorPlan={appState.floorPlan}
                 analytics={appState.analytics}
+                ilots={appState.ilots}
+                corridors={appState.corridors}
                 settings={appState.settings}
                 onSettingsChange={handleSettingsChange}
               />
@@ -418,7 +420,7 @@ export default function FloorPlanAnalyzer() {
           <Walkthrough3D
             floorPlan={appState.floorPlan}
             ilots={appState.ilots}
-            walls={appState.floorPlan?.processed?.walls || []}
+            walls={appState.floorPlan?.walls || []}
             corridors={appState.corridors}
             onClose={handle3DWalkthroughClose}
           />
