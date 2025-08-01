@@ -138,23 +138,26 @@ export default function PixelPerfectCADRenderer({
     ctx.lineJoin = 'round';
 
     walls.forEach(wall => {
-      if (wall.points.length >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(wall.points[0].x, wall.points[0].y);
+      // Wall points is a tuple [Point, Point] according to schema
+      if (wall.points && wall.points.length === 2 && wall.points[0] && wall.points[1]) {
+        const [startPoint, endPoint] = wall.points;
         
-        for (let i = 1; i < wall.points.length; i++) {
-          ctx.lineTo(wall.points[i].x, wall.points[i].y);
-        }
-        
-        ctx.stroke();
-
-        // Add wall thickness representation
-        if (wall.thickness && wall.thickness > 100) {
-          ctx.save();
-          ctx.strokeStyle = COLORS.WALLS;
-          ctx.lineWidth = Math.max(1, wall.thickness * scale * 0.001);
+        // Ensure points have valid coordinates
+        if (typeof startPoint.x === 'number' && typeof startPoint.y === 'number' &&
+            typeof endPoint.x === 'number' && typeof endPoint.y === 'number') {
+          ctx.beginPath();
+          ctx.moveTo(startPoint.x, startPoint.y);
+          ctx.lineTo(endPoint.x, endPoint.y);
           ctx.stroke();
-          ctx.restore();
+
+          // Add wall thickness representation
+          if (wall.thickness && wall.thickness > 0) {
+            ctx.save();
+            ctx.strokeStyle = COLORS.WALLS;
+            ctx.lineWidth = Math.max(1, (wall.thickness || 1) * scale * 0.001);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
       }
     });
