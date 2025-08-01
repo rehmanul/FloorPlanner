@@ -1,0 +1,82 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+12:02:43 PM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+12:02:51 PM [vite] hmr update /src/index.css?v=9-TnebodP-t5YH7ptjp_9, /src/components/ilot-configuration.tsx
+12:02:52 PM [vite] hmr update /src/components/ilot-configuration.tsx, /src/index.css?v=9-TnebodP-t5YH7ptjp_9
+12:02:52 PM [vite] Internal server error: /home/runner/workspace/client/src/components/ilot-configuration.tsx: Unexpected token, expected "," (91:3)
+
+  89 |       setIsGenerating(false);
+  90 |     }
+> 91 |   };
+     |    ^
+  92 |
+  93 |   return (
+  94 |     <Card className="border-0 shadow-none">
+  Plugin: vite:react-babel
+  File: /home/runner/workspace/client/src/components/ilot-configuration.tsx:91:3
+  89 |        setIsGenerating(false);
+  90 |      }
+  91 |    };
+     |     ^
+  92 |  
+  93 |    return (
+      at toParseError (/home/runner/workspace/node_modules/@babel/parser/src/parse-error.ts:95:45)
+      at raise (/home/runner/workspace/node_modules/@babel/parser/src/tokenizer/index.ts:1497:19)
+      at unexpected (/home/runner/workspace/node_modules/@babel/parser/src/tokenizer/index.ts:1537:16)
+      at expect (/home/runner/workspace/node_modules/@babel/parser/src/parser/util.ts:157:12)
+      at parseCallExpressionArguments (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:999:14)
+      at parseCoverCallAndAsyncArrowHead (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:888:29)
+      at parseSubscript (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:777:19)
+      at parseSubscript (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2734:20)
+      at parseSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:735:19)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:720:17)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:401:23)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3607:22)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:252:12)
+      at allowInAnd (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3112:16)
+      at parseMaybeAssignAllowIn (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:251:17)
+      at parseVar (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1563:18)
+      at parseVarStatement (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1227:10)
+      at parseVarStatement (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3007:33)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:566:21)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3056:20)
+      at parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:437:17)
+      at parseStatementListItem (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:386:17)
+      at parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1420:16)
+      at parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1393:10)
+      at parseBlock (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1361:10)
+      at parseFunctionBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:2557:24)
+      at parseFunctionBodyAndFinish (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:2526:10)
+      at parseFunctionBodyAndFinish (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2538:20)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1667:12)
+      at withSmartMixTopicForbiddingContext (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3091:14)
+      at parseFunction (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1665:10)
+      at parseExportDefaultExpression (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:2536:19)
+      at parseExportDefaultExpression (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2998:20)
+      at parseExport (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:2420:25)
+      at parseExport (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2968:22)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:610:25)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3056:20)
+      at parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:437:17)
+      at parseModuleItem (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:374:17)
+      at parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1419:16)
+      at parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1393:10)
+      at parseProgram (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:225:10)
+      at parseTopLevel (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:203:25)
+      at parse (/home/runner/workspace/node_modules/@babel/parser/src/parser/index.ts:90:10)
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.5.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.5.2
+npm notice To update run: npm install -g npm@11.5.2
+npm notice
