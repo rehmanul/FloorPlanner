@@ -45,7 +45,7 @@ interface GeneticIndividual {
 
 export class AdvancedIlotPlacementEngine {
   private settings: PlacementSettings = {
-    corridorWidth: 120,
+    corridorWidth: 1200, // 1200mm = 1.2m as requested
     minClearance: 80,
     algorithm: 'advanced-ai',
     optimizationTarget: 'area',
@@ -110,55 +110,60 @@ export class AdvancedIlotPlacementEngine {
     // Analyze space characteristics
     const spaceDepth = floorPlan.bounds.maxY - floorPlan.bounds.minY;
     const spaceWidth = floorPlan.bounds.maxX - floorPlan.bounds.minX;
+    
+    // Ensure minimum dimensions
+    if (spaceWidth <= 0 || spaceDepth <= 0) {
+      console.log('⚠️ Invalid space dimensions');
+      return [];
+    }
+    
     const aspectRatio = spaceWidth / spaceDepth;
     
-    // Calculate maximum reasonable îlot size based on available space
-    const maxWidth = Math.min(spaceWidth * 0.3, 200); // Max 30% of space width or 200mm
-    const maxHeight = Math.min(spaceDepth * 0.3, 150); // Max 30% of space height or 150mm
+    // Calculate more realistic îlot sizes for complex floor plans
+    // Use smaller percentages for complex layouts
+    const maxWidth = Math.max(150, Math.min(spaceWidth * 0.15, 300)); // 15% of space width, min 150mm, max 300mm
+    const maxHeight = Math.max(100, Math.min(spaceDepth * 0.15, 200)); // 15% of space height, min 100mm, max 200mm
+    
+    console.log(`Space analysis: ${spaceWidth}x${spaceDepth}mm, max îlot: ${maxWidth}x${maxHeight}mm`);
     
     // Dynamic size definitions based on space analysis
     const baseSizes: IlotSize[] = [
-      { type: 'small', width: Math.min(120, maxWidth * 0.6), height: Math.min(80, maxHeight * 0.6), weight: 0.5, priority: 1 },
-      { type: 'medium', width: Math.min(160, maxWidth * 0.8), height: Math.min(100, maxHeight * 0.8), weight: 0.3, priority: 2 },
-      { type: 'large', width: Math.min(200, maxWidth), height: Math.min(120, maxHeight), weight: 0.15, priority: 3 },
-      { type: 'xlarge', width: Math.min(240, maxWidth * 1.2), height: Math.min(140, maxHeight * 1.2), weight: 0.05, priority: 4 }
-    ].filter(size => size.width >= 50 && size.height >= 40); // Filter out too small sizes
+      { type: 'small', width: Math.min(150, maxWidth * 0.5), height: Math.min(100, maxHeight * 0.5), weight: 0.4, priority: 1 },
+      { type: 'medium', width: Math.min(200, maxWidth * 0.7), height: Math.min(130, maxHeight * 0.7), weight: 0.35, priority: 2 },
+      { type: 'large', width: Math.min(250, maxWidth * 0.9), height: Math.min(160, maxHeight * 0.9), weight: 0.2, priority: 3 },
+      { type: 'xlarge', width: Math.min(300, maxWidth), height: Math.min(200, maxHeight), weight: 0.05, priority: 4 }
+    ].filter(size => size.width >= 80 && size.height >= 60); // Minimum practical sizes
     
     if (baseSizes.length === 0) {
       console.log('⚠️ Space too small for any îlots');
       return [];
     }
     
-    // Calculate reasonable target count based on area
-    const minIlotArea = (baseSizes[0].width * baseSizes[0].height) / 10000; // Convert to m²
-    const maxPossibleIlots = Math.floor(targetArea / minIlotArea);
-    const targetTotalIlots = Math.min(maxPossibleIlots, 20); // Cap at 20 îlots
+    // Calculate reasonable target count based on area and space complexity
+    const estimatedIlotCount = Math.max(3, Math.min(Math.floor(targetArea * 1000), 25)); // 3-25 îlots
+    console.log(`Target îlot count: ${estimatedIlotCount}`);
     
-    if (targetTotalIlots <= 0) {
-      console.log('⚠️ Target area too small for îlots');
-      return [];
-    }
-    
-    // Intelligent size adaptation
+    // Generate îlots with intelligent distribution
     baseSizes.forEach(def => {
       const adjustedSize = this.adaptSizeToSpace(def, floorPlan, aspectRatio);
-      const targetCount = Math.max(1, Math.floor(targetTotalIlots * adjustedSize.weight));
+      const targetCount = Math.max(1, Math.floor(estimatedIlotCount * adjustedSize.weight));
       
       for (let i = 0; i < targetCount; i++) {
-        // Intelligent variation for realistic placement
-        const variationFactor = 0.1; // 10% variation
+        // Add realistic size variation
+        const variationFactor = 0.15; // 15% variation
         const widthVariation = 1 + (Math.random() - 0.5) * variationFactor;
         const heightVariation = 1 + (Math.random() - 0.5) * variationFactor;
         
         sizes.push({
           ...adjustedSize,
-          width: Math.round(Math.max(50, adjustedSize.width * widthVariation)),
-          height: Math.round(Math.max(40, adjustedSize.height * heightVariation))
+          width: Math.round(Math.max(80, adjustedSize.width * widthVariation)),
+          height: Math.round(Math.max(60, adjustedSize.height * heightVariation))
         });
       }
     });
     
-    return sizes.sort((a, b) => a.priority - b.priority); // Start with smallest sizes
+    console.log(`Generated ${sizes.length} îlot variants`);
+    return sizes.sort((a, b) => a.priority - b.priority);
   }
 
   private adaptSizeToSpace(size: IlotSize, floorPlan: ProcessedFloorPlan, aspectRatio: number): IlotSize {
@@ -196,78 +201,92 @@ export class AdvancedIlotPlacementEngine {
   ): Promise<void> {
     console.log('🧠 Executing Advanced AI Placement Algorithm');
     
-    // Calculate available space with adaptive clearance
+    if (sizes.length === 0) {
+      console.log('⚠️ No îlot sizes provided');
+      return;
+    }
+    
+    // Calculate available space with intelligent room detection
     const bounds = floorPlan.bounds;
     const totalWidth = bounds.maxX - bounds.minX;
     const totalHeight = bounds.maxY - bounds.minY;
     
-    // Adaptive clearance - reduce if space is too small
-    let adaptiveClearance = this.settings.minClearance;
-    if (totalWidth < 1000 || totalHeight < 1000) {
-      adaptiveClearance = Math.min(this.settings.minClearance, 30); // Minimum 30mm clearance
-    }
+    // Use adaptive clearance based on space size
+    let adaptiveClearance = Math.max(50, Math.min(this.settings.minClearance, totalWidth * 0.05, totalHeight * 0.05));
     
-    const usableWidth = totalWidth - (adaptiveClearance * 2);
-    const usableHeight = totalHeight - (adaptiveClearance * 2);
+    console.log(`Space bounds: ${totalWidth}x${totalHeight}mm, using ${adaptiveClearance}mm clearance`);
     
-    console.log(`Available space: ${usableWidth}x${usableHeight}mm (adaptive clearance: ${adaptiveClearance}mm)`);
+    // Find open areas within the floor plan for placement
+    const placementZones = this.identifyPlacementZones(floorPlan, adaptiveClearance);
     
-    // Check if we have enough space
-    if (usableWidth <= 0 || usableHeight <= 0) {
-      console.log('⚠️ Insufficient space for îlot placement');
+    if (placementZones.length === 0) {
+      console.log('⚠️ No suitable placement zones found');
       return;
     }
     
-    let placedCount = 0;
-    const maxAttemptsPerIlot = 50;
-    const maxTotalAttempts = sizes.length * maxAttemptsPerIlot;
+    console.log(`Found ${placementZones.length} placement zones`);
     
-    for (let sizeIndex = 0; sizeIndex < sizes.length && placedCount < Math.floor(sizes.length * 0.8); sizeIndex++) {
+    let placedCount = 0;
+    const maxAttemptsPerIlot = 100;
+    
+    // Try to place each îlot in the best available zones
+    for (let sizeIndex = 0; sizeIndex < sizes.length && placedCount < Math.floor(sizes.length * 0.9); sizeIndex++) {
       const size = sizes[sizeIndex];
       let placed = false;
       
-      // Skip if îlot is too large for available space
-      if (size.width > usableWidth || size.height > usableHeight) {
-        console.log(`⚠️ Îlot ${size.type} (${size.width}x${size.height}) too large for space`);
+      // Sort zones by suitability for this îlot size
+      const suitableZones = placementZones
+        .filter(zone => zone.width >= size.width + 20 && zone.height >= size.height + 20)
+        .sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      
+      if (suitableZones.length === 0) {
+        console.log(`⚠️ No suitable zones for îlot ${size.type} (${size.width}x${size.height})`);
         continue;
       }
       
-      // Try multiple positions for each îlot
-      for (let attempt = 0; attempt < maxAttemptsPerIlot && !placed; attempt++) {
-        // Generate random position within bounds
-        const maxX = usableWidth - size.width;
-        const maxY = usableHeight - size.height;
+      // Try placement in each suitable zone
+      for (const zone of suitableZones) {
+        if (placed) break;
         
-        if (maxX <= 0 || maxY <= 0) break; // Not enough space
-        
-        const x = bounds.minX + adaptiveClearance + Math.random() * maxX;
-        const y = bounds.minY + adaptiveClearance + Math.random() * maxY;
-        
-        const candidate = {
-          x: Math.round(x),
-          y: Math.round(y),
-          width: size.width,
-          height: size.height
-        };
-        
-        // Check if this position is valid
-        if (this.isValidPlacement(candidate, ilots, floorPlan, adaptiveClearance)) {
-          const newIlot: Ilot = {
-            id: `ilot_${placedCount}`,
-            x: candidate.x,
-            y: candidate.y,
-            width: candidate.width,
-            height: candidate.height,
-            area: (candidate.width * candidate.height) / 10000, // Convert to m²
-            type: size.type
+        for (let attempt = 0; attempt < maxAttemptsPerIlot && !placed; attempt++) {
+          // Generate position within this zone
+          const maxX = zone.width - size.width;
+          const maxY = zone.height - size.height;
+          
+          if (maxX <= 0 || maxY <= 0) continue;
+          
+          const x = zone.x + Math.random() * maxX;
+          const y = zone.y + Math.random() * maxY;
+          
+          const candidate = {
+            x: Math.round(x),
+            y: Math.round(y),
+            width: size.width,
+            height: size.height
           };
           
-          ilots.push(newIlot);
-          this.bestSolution.push(newIlot);
-          placedCount++;
-          placed = true;
-          
-          console.log(`✅ Placed îlot ${placedCount}: ${size.type} at (${candidate.x}, ${candidate.y})`);
+          // Check if this position is valid
+          if (this.isValidPlacement(candidate, ilots, floorPlan, 30)) {
+            const newIlot: Ilot = {
+              id: `ilot_${placedCount + 1}`,
+              x: candidate.x,
+              y: candidate.y,
+              width: candidate.width,
+              height: candidate.height,
+              area: (candidate.width * candidate.height) / 1000000, // Convert to m²
+              type: size.type
+            };
+            
+            ilots.push(newIlot);
+            this.bestSolution.push(newIlot);
+            placedCount++;
+            placed = true;
+            
+            console.log(`✅ Placed îlot ${placedCount}: ${size.type} (${size.width}x${size.height}) at (${candidate.x}, ${candidate.y})`);
+            
+            // Update zones to reflect occupied space
+            this.updatePlacementZones(placementZones, candidate, adaptiveClearance);
+          }
         }
       }
       
@@ -276,8 +295,120 @@ export class AdvancedIlotPlacementEngine {
       }
     }
     
-    this.bestScore = placedCount / Math.max(sizes.length, 1); // Simple fitness score
+    this.bestScore = placedCount / Math.max(sizes.length, 1);
     console.log(`🎯 Placement complete: ${placedCount} îlots placed out of ${sizes.length} requested`);
+  }
+
+  private identifyPlacementZones(floorPlan: ProcessedFloorPlan, clearance: number): Array<{x: number, y: number, width: number, height: number}> {
+    const bounds = floorPlan.bounds;
+    const zones: Array<{x: number, y: number, width: number, height: number}> = [];
+    
+    // For complex floor plans, create a grid-based approach to find open areas
+    const gridSize = 200; // 200mm grid
+    const cols = Math.floor((bounds.maxX - bounds.minX) / gridSize);
+    const rows = Math.floor((bounds.maxY - bounds.minY) / gridSize);
+    
+    // Create a grid to track occupied vs free space
+    const grid: boolean[][] = Array(rows).fill(null).map(() => Array(cols).fill(false));
+    
+    // Mark restricted areas and door clearances
+    floorPlan.restrictedAreas.forEach(area => {
+      const startCol = Math.max(0, Math.floor((area.bounds.minX - bounds.minX - clearance) / gridSize));
+      const endCol = Math.min(cols - 1, Math.floor((area.bounds.maxX - bounds.minX + clearance) / gridSize));
+      const startRow = Math.max(0, Math.floor((area.bounds.minY - bounds.minY - clearance) / gridSize));
+      const endRow = Math.min(rows - 1, Math.floor((area.bounds.maxY - bounds.minY + clearance) / gridSize));
+      
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          grid[r][c] = true; // Mark as occupied
+        }
+      }
+    });
+    
+    // Mark door clearances
+    floorPlan.doors.forEach(door => {
+      const doorClearance = door.radius + clearance;
+      const startCol = Math.max(0, Math.floor((door.center.x - doorClearance - bounds.minX) / gridSize));
+      const endCol = Math.min(cols - 1, Math.floor((door.center.x + doorClearance - bounds.minX) / gridSize));
+      const startRow = Math.max(0, Math.floor((door.center.y - doorClearance - bounds.minY) / gridSize));
+      const endRow = Math.min(rows - 1, Math.floor((door.center.y + doorClearance - bounds.minY) / gridSize));
+      
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          grid[r][c] = true; // Mark as occupied
+        }
+      }
+    });
+    
+    // Find contiguous free areas and convert to zones
+    const visited: boolean[][] = Array(rows).fill(null).map(() => Array(cols).fill(false));
+    
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!grid[r][c] && !visited[r][c]) {
+          // Found a free cell, explore the connected area
+          const zone = this.exploreZone(grid, visited, r, c, rows, cols);
+          if (zone.width >= 300 && zone.height >= 200) { // Minimum zone size
+            zones.push({
+              x: bounds.minX + zone.startCol * gridSize + clearance,
+              y: bounds.minY + zone.startRow * gridSize + clearance,
+              width: zone.width * gridSize - clearance * 2,
+              height: zone.height * gridSize - clearance * 2
+            });
+          }
+        }
+      }
+    }
+    
+    return zones;
+  }
+
+  private exploreZone(grid: boolean[][], visited: boolean[][], startRow: number, startCol: number, rows: number, cols: number): {startRow: number, startCol: number, width: number, height: number} {
+    const queue: Array<{r: number, c: number}> = [{r: startRow, c: startCol}];
+    let minRow = startRow, maxRow = startRow;
+    let minCol = startCol, maxCol = startCol;
+    
+    while (queue.length > 0) {
+      const {r, c} = queue.shift()!;
+      
+      if (r < 0 || r >= rows || c < 0 || c >= cols || visited[r][c] || grid[r][c]) {
+        continue;
+      }
+      
+      visited[r][c] = true;
+      minRow = Math.min(minRow, r);
+      maxRow = Math.max(maxRow, r);
+      minCol = Math.min(minCol, c);
+      maxCol = Math.max(maxCol, c);
+      
+      // Add neighbors
+      queue.push({r: r - 1, c}, {r: r + 1, c}, {r, c: c - 1}, {r, c: c + 1});
+    }
+    
+    return {
+      startRow: minRow,
+      startCol: minCol,
+      width: maxCol - minCol + 1,
+      height: maxRow - minRow + 1
+    };
+  }
+
+  private updatePlacementZones(zones: Array<{x: number, y: number, width: number, height: number}>, placedIlot: Rectangle, clearance: number): void {
+    // Remove or split zones that are now occupied
+    for (let i = zones.length - 1; i >= 0; i--) {
+      const zone = zones[i];
+      const expandedIlot = {
+        x: placedIlot.x - clearance,
+        y: placedIlot.y - clearance,
+        width: placedIlot.width + clearance * 2,
+        height: placedIlot.height + clearance * 2
+      };
+      
+      if (this.utils.rectanglesOverlap(zone, expandedIlot, 0)) {
+        zones.splice(i, 1); // Remove the affected zone
+        // In a more sophisticated implementation, we could split the zone
+      }
+    }
   }
 
   private async neuralGeneticPlacement(
@@ -643,49 +774,126 @@ export class AdvancedIlotPlacementEngine {
   private generateOptimalCorridors(ilots: Ilot[], floorPlan: ProcessedFloorPlan): Corridor[] {
     const corridors: Corridor[] = [];
     
-    if (ilots.length === 0) return corridors;
+    if (ilots.length < 2) return corridors;
     
-    const bounds = floorPlan.bounds;
+    // Group îlots into rows to identify facing rows
+    const ilotRows = this.groupIlotsIntoRows(ilots);
     
-    // Generate main horizontal corridor
-    if (ilots.length > 1) {
-      const centerY = (bounds.minY + bounds.maxY) / 2;
-      corridors.push({
-        id: 'main_horizontal',
-        x1: bounds.minX + this.settings.minClearance,
-        y1: centerY,
-        x2: bounds.maxX - this.settings.minClearance,
-        y2: centerY,
-        width: this.settings.corridorWidth,
-        type: 'horizontal'
-      });
+    if (ilotRows.length < 2) {
+      console.log('⚠️ Not enough îlot rows for corridor generation');
+      return corridors;
     }
     
-    // Generate vertical corridors connecting to îlots
-    const sortedIlots = [...ilots].sort((a, b) => a.x - b.x);
+    console.log(`Found ${ilotRows.length} îlot rows for corridor generation`);
     
-    for (let i = 0; i < sortedIlots.length - 1; i++) {
-      const ilot1 = sortedIlots[i];
-      const ilot2 = sortedIlots[i + 1];
+    // Generate corridors between facing rows
+    for (let i = 0; i < ilotRows.length - 1; i++) {
+      const row1 = ilotRows[i];
+      const row2 = ilotRows[i + 1];
       
-      // Add vertical corridor between îlots if they're far apart
-      const distance = ilot2.x - (ilot1.x + ilot1.width);
-      if (distance > this.settings.corridorWidth * 2) {
-        const corridorX = ilot1.x + ilot1.width + distance / 2;
+      // Check if rows are facing each other (close enough vertically)
+      const verticalGap = Math.abs(row2.centerY - row1.centerY);
+      if (verticalGap > this.settings.corridorWidth * 3) continue; // Too far apart
+      
+      // Find overlapping horizontal range
+      const leftBound = Math.max(row1.minX, row2.minX);
+      const rightBound = Math.min(row1.maxX, row2.maxX);
+      
+      if (rightBound > leftBound + 200) { // Minimum 200mm overlap
+        const corridorY = (row1.centerY + row2.centerY) / 2;
+        
         corridors.push({
-          id: `vertical_${i}`,
-          x1: corridorX,
-          y1: bounds.minY + this.settings.minClearance,
-          x2: corridorX,
-          y2: bounds.maxY - this.settings.minClearance,
+          id: `corridor_rows_${i}_${i + 1}`,
+          x1: leftBound,
+          y1: corridorY,
+          x2: rightBound,
+          y2: corridorY,
           width: this.settings.corridorWidth,
-          type: 'vertical'
+          type: 'horizontal'
         });
+        
+        console.log(`✅ Created corridor between row ${i} and ${i + 1}`);
       }
     }
     
+    // Add connection corridors to doors
+    floorPlan.doors.forEach((door, index) => {
+      const nearestIlot = this.findNearestIlot(door.center, ilots);
+      if (nearestIlot) {
+        const ilotCenter = {
+          x: nearestIlot.x + nearestIlot.width / 2,
+          y: nearestIlot.y + nearestIlot.height / 2
+        };
+        
+        // Create L-shaped corridor to door
+        corridors.push({
+          id: `door_connection_${index}`,
+          x1: ilotCenter.x,
+          y1: ilotCenter.y,
+          x2: door.center.x,
+          y2: door.center.y,
+          width: this.settings.corridorWidth,
+          type: 'connection'
+        });
+      }
+    });
+    
     console.log(`✅ Generated ${corridors.length} corridors`);
     return corridors;
+  }
+
+  private groupIlotsIntoRows(ilots: Ilot[]): Array<{
+    centerY: number,
+    minX: number,
+    maxX: number,
+    ilots: Ilot[]
+  }> {
+    const threshold = 200; // 200mm threshold for same row
+    const rows: Array<{centerY: number, minX: number, maxX: number, ilots: Ilot[]}> = [];
+    
+    ilots.forEach(ilot => {
+      const ilotCenterY = ilot.y + ilot.height / 2;
+      
+      // Find existing row or create new one
+      let targetRow = rows.find(row => Math.abs(row.centerY - ilotCenterY) < threshold);
+      
+      if (!targetRow) {
+        targetRow = {
+          centerY: ilotCenterY,
+          minX: ilot.x,
+          maxX: ilot.x + ilot.width,
+          ilots: []
+        };
+        rows.push(targetRow);
+      }
+      
+      targetRow.ilots.push(ilot);
+      targetRow.minX = Math.min(targetRow.minX, ilot.x);
+      targetRow.maxX = Math.max(targetRow.maxX, ilot.x + ilot.width);
+      
+      // Update center Y as weighted average
+      const totalIlots = targetRow.ilots.length;
+      targetRow.centerY = targetRow.ilots.reduce((sum, i) => sum + (i.y + i.height / 2), 0) / totalIlots;
+    });
+    
+    return rows.sort((a, b) => a.centerY - b.centerY);
+  }
+
+  private findNearestIlot(point: {x: number, y: number}, ilots: Ilot[]): Ilot | null {
+    if (ilots.length === 0) return null;
+    
+    let nearest = ilots[0];
+    let minDistance = this.utils.distanceFromPointToRectangle(point, nearest);
+    
+    for (let i = 1; i < ilots.length; i++) {
+      const distance = this.utils.distanceFromPointToRectangle(point, ilots[i]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = ilots[i];
+      }
+    }
+    
+    return nearest;
   }
 
   // Utility methods
